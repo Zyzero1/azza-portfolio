@@ -33,6 +33,51 @@ const experiencesDefault = [
   }
 ];
 
+const defaultResearches = [
+  {
+    id: 1,
+    title: 'Maritime Traffic Data Analysis & Prediction',
+    badge: 'AI & ML',
+    period: '2024 - 2025',
+    institution: 'Independent Research in Maritime Informatics · UMRAH',
+    description: [
+      'Developed predictive models for cargo vessel arrival patterns utilizing Python (Pandas, NumPy, Scikit-Learn).',
+      'Conducted data preprocessing, feature engineering, and regression model accuracy evaluations to optimize archipelagic port management.',
+      'Visualized historical vessel traffic trends into interactive analytical dashboards for port authorities and operations.'
+    ]
+  },
+  {
+    id: 2,
+    title: 'Comparative Study on Flutter State Management',
+    badge: 'Benchmark',
+    period: '2024',
+    institution: 'Mobile Architecture & Performance Benchmark',
+    description: [
+      'Analyzed memory consumption efficiency and widget rendering latencies between Provider, BLoC, and Riverpod.',
+      'Formulated scalable architectural guidelines for mid-to-large scale cross-platform mobile app development.'
+    ]
+  }
+];
+
+const defaultEducations = [
+  {
+    id: 1,
+    title: 'Bachelor of Informatics Engineering',
+    badge: 'Undergraduate',
+    period: '2022 - Present',
+    institution: 'Universitas Maritim Raja Ali Haji (UMRAH) · Tanjungpinang, Indonesia',
+    description: 'Pursuing an in-depth curriculum in software engineering, data structures & algorithms, relational database systems, object-oriented programming (OOP), artificial intelligence, and applied maritime informatics architecture. Actively honing hands-on engineering skills through university lab projects and independent software initiatives.'
+  },
+  {
+    id: 2,
+    title: 'Senior High School (Natural Sciences)',
+    badge: 'High School',
+    period: '2018 - 2021',
+    institution: 'SMAN 04 Karimun · Tanjung Balai Karimun, Indonesia',
+    description: 'Focused on Mathematics and Natural Sciences (MIPA), building a solid foundation in analytical thinking, algorithmic problem solving, and student council leadership.'
+  }
+];
+
 const profileDefault = {
   name: 'Muhammad Azza Al Kausar',
   role: 'Front-End and Back-End Developer',
@@ -67,6 +112,8 @@ function useData() {
   const [projects, setProjects] = useStored('portfolio_projects', projectsDefault);
   const [articles, setArticles] = useStored('portfolio_articles', articlesDefault);
   const [experiences, setExperiences] = useStored('portfolio_experiences', experiencesDefault);
+  const [researches, setResearches] = useStored('portfolio_researches', defaultResearches);
+  const [educations, setEducations] = useStored('portfolio_educations', defaultEducations);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -96,6 +143,12 @@ function useData() {
               if (Array.isArray(parsed) && parsed.length > 0) expFromProfile = parsed;
             } catch {}
           }
+          if (p.education && typeof p.education === 'string' && p.education.startsWith('[')) {
+            try {
+              const parsedEdu = JSON.parse(p.education);
+              if (Array.isArray(parsedEdu) && parsedEdu.length > 0) setEducations(parsedEdu);
+            } catch {}
+          }
           setProfile({
             ...p,
             aboutBio: p.about_bio || p.aboutBio || defaultAboutBio,
@@ -123,6 +176,7 @@ function useData() {
           setProjects(projectsResult.value.data.map((item) => ({
             ...item,
             technologies: Array.isArray(item.technologies) ? item.technologies : [],
+            description: item.description || ''
           })));
         }
 
@@ -144,9 +198,9 @@ function useData() {
     return () => {
       active = false;
     };
-  }, [setProfile, setProjects, setArticles, setExperiences]);
+  }, [setProfile, setProjects, setArticles, setExperiences, setEducations]);
 
-  return { profile, setProfile, projects, setProjects, articles, setArticles, experiences, setExperiences, loading, error };
+  return { profile, setProfile, projects, setProjects, articles, setArticles, experiences, setExperiences, researches, setResearches, educations, setEducations, loading, error };
 }
 function Login() { const [error, setError] = useState(''); const [loading, setLoading] = useState(false); const navigate = useNavigate(); const submit = async (event) => { event.preventDefault(); if (!isSupabaseConfigured) return setError('Supabase belum terkonfigurasi.'); const form = new FormData(event.currentTarget); setLoading(true); const { error: authError } = await supabase.auth.signInWithPassword({ email: String(form.get('email')), password: String(form.get('password')) }); setLoading(false); if (authError) return setError(authError.message); navigate('/admin'); }; return <div className="min-h-screen flex items-center justify-center px-4"><form onSubmit={submit} className="kartu-transparan rounded-xl p-8 w-full max-w-md"><Link to="/" className="text-neon-blue">← Kembali</Link><h1 className="text-3xl font-bold mt-8 mb-8">Admin Portfolio</h1><div className="space-y-4"><input name="email" type="email" required className="form-field" placeholder="Email admin" /><input name="password" type="password" required className="form-field" placeholder="Password" /><button disabled={loading} className="btn-neon w-full">{loading ? 'Memeriksa...' : 'Masuk'}</button>{error && <p className="text-red-300">{error}</p>}</div></form></div>; }
 function Field({ label, value, onChange, area = false, type = 'text', placeholder = '' }) { const Tag = area ? 'textarea' : 'input'; return <label className="grid gap-2 text-sm"><span className="text-gray-300">{label}</span><Tag className="form-field" placeholder={placeholder} rows={area ? 5 : undefined} type={area ? undefined : type} value={value ?? ''} onChange={(event) => onChange(event.target.value)} /></label>; }
@@ -160,9 +214,18 @@ function Admin({ data }) {
   const [editingProjectId, setEditingProjectId] = useState(null);
   const [experienceItem, setExperienceItem] = useState({ title: '', company: '', period: '', badge: '', description: '' });
   const [editingExpId, setEditingExpId] = useState(null);
+  const [savingExp, setSavingExp] = useState(false);
+
+  const [researchItem, setResearchItem] = useState({ title: '', institution: '', period: '', badge: '', description: '' });
+  const [editingResearchId, setEditingResearchId] = useState(null);
+  const [savingResearch, setSavingResearch] = useState(false);
+
+  const [educationItem, setEducationItem] = useState({ title: '', institution: '', period: '', badge: '', description: '' });
+  const [editingEducationId, setEditingEducationId] = useState(null);
+  const [savingEducation, setSavingEducation] = useState(false);
+
   const [savingProfile, setSavingProfile] = useState(false);
   const [savingProject, setSavingProject] = useState(false);
-  const [savingExp, setSavingExp] = useState(false);
 
   const resetProjectForm = () => {
     setProject({ title: '', description: '', technologies: '', image: '', url: '' });
@@ -262,6 +325,133 @@ function Admin({ data }) {
     }
   };
 
+  const resetResearchForm = () => {
+    setResearchItem({ title: '', institution: '', period: '', badge: '', description: '' });
+    setEditingResearchId(null);
+  };
+
+  const handleEditResearch = (item) => {
+    setEditingResearchId(item.id);
+    setResearchItem({
+      title: item.title || '',
+      institution: item.institution || item.company || '',
+      period: item.period || '',
+      badge: item.badge || '',
+      description: Array.isArray(item.description) ? item.description.join('\n') : (item.description || '')
+    });
+    setTab('research');
+  };
+
+  const saveResearch = async (e) => {
+    e.preventDefault();
+    try {
+      setSavingResearch(true);
+      const descLines = researchItem.description.split('\n').map(s => s.trim()).filter(Boolean);
+      const payload = {
+        title: researchItem.title,
+        institution: researchItem.institution,
+        period: researchItem.period,
+        badge: researchItem.badge,
+        description: descLines
+      };
+
+      let updatedList;
+      if (editingResearchId) {
+        updatedList = data.researches.map(item => item.id === editingResearchId ? { ...item, ...payload } : item);
+      } else {
+        const newId = Date.now();
+        updatedList = [{ id: newId, ...payload }, ...data.researches];
+      }
+
+      data.setResearches(updatedList);
+      setNotice(editingResearchId ? 'Data riset berhasil diperbarui.' : 'Data riset baru berhasil ditambahkan.');
+      resetResearchForm();
+    } catch (err) {
+      setNotice(`Error: ${err.message}`);
+    } finally {
+      setSavingResearch(false);
+    }
+  };
+
+  const removeResearch = (id) => {
+    const updatedList = data.researches.filter(item => item.id !== id);
+    data.setResearches(updatedList);
+    setNotice('Data riset berhasil dihapus.');
+  };
+
+  const resetEducationForm = () => {
+    setEducationItem({ title: '', institution: '', period: '', badge: '', description: '' });
+    setEditingEducationId(null);
+  };
+
+  const handleEditEducation = (item) => {
+    setEditingEducationId(item.id);
+    setEducationItem({
+      title: item.title || '',
+      institution: item.institution || item.company || '',
+      period: item.period || '',
+      badge: item.badge || '',
+      description: Array.isArray(item.description) ? item.description.join(' ') : (item.description || '')
+    });
+    setTab('education');
+  };
+
+  const saveEducation = async (e) => {
+    e.preventDefault();
+    try {
+      setSavingEducation(true);
+      const payload = {
+        title: educationItem.title,
+        institution: educationItem.institution,
+        period: educationItem.period,
+        badge: educationItem.badge,
+        description: educationItem.description
+      };
+
+      let updatedList;
+      if (editingEducationId) {
+        updatedList = data.educations.map(item => item.id === editingEducationId ? { ...item, ...payload } : item);
+      } else {
+        const newId = Date.now();
+        updatedList = [{ id: newId, ...payload }, ...data.educations];
+      }
+
+      data.setEducations(updatedList);
+
+      if (isSupabaseConfigured) {
+        try {
+          await supabase.from('profiles').update({
+            education: JSON.stringify(updatedList),
+            updated_at: new Date().toISOString()
+          }).not('id', 'is', null);
+        } catch (syncErr) {
+          console.warn('profiles.education sync error:', syncErr);
+        }
+      }
+
+      setNotice(editingEducationId ? 'Pendidikan berhasil diperbarui di Supabase.' : 'Pendidikan baru berhasil ditambahkan ke Supabase.');
+      resetEducationForm();
+    } catch (err) {
+      setNotice(`Error: ${err.message}`);
+    } finally {
+      setSavingEducation(false);
+    }
+  };
+
+  const removeEducation = async (id) => {
+    const updatedList = data.educations.filter(item => item.id !== id);
+    data.setEducations(updatedList);
+    if (isSupabaseConfigured) {
+      try {
+        await supabase.from('profiles').update({
+          education: JSON.stringify(updatedList),
+          updated_at: new Date().toISOString()
+        }).not('id', 'is', null);
+      } catch {}
+    }
+    setNotice('Data pendidikan berhasil dihapus.');
+  };
+
   const saveProfile = async () => {
     try {
       setSavingProfile(true);
@@ -274,7 +464,8 @@ function Admin({ data }) {
         profileImageUrl = await uploadPortfolioImage(profileFile, 'profile');
       }
 
-      const payload = {
+      // Base columns that are guaranteed to exist in Supabase profiles table
+      const basePayload = {
         name: data.profile.name,
         role: data.profile.role,
         tagline: data.profile.tagline,
@@ -287,39 +478,43 @@ function Admin({ data }) {
         soft_skills: data.profile.softSkills,
         updated_at: new Date().toISOString()
       };
-      if (profileImageUrl) payload.image = profileImageUrl;
-      if (data.profile.aboutBio) payload.about_bio = data.profile.aboutBio;
-      if (data.profile.availability) payload.availability = data.profile.availability;
-      if (data.profile.email) payload.email = data.profile.email;
-      if (data.profile.linkedin) payload.linkedin = data.profile.linkedin;
-      if (cvUrl) payload.cv_url = cvUrl;
+      if (profileImageUrl) basePayload.image = profileImageUrl;
+
+      // Extended optional columns (if added via SQL editor in Supabase)
+      const fullPayload = {
+        ...basePayload,
+        ...(data.profile.aboutBio ? { about_bio: data.profile.aboutBio } : {}),
+        ...(data.profile.availability ? { availability: data.profile.availability } : {}),
+        ...(data.profile.email ? { email: data.profile.email } : {}),
+        ...(data.profile.linkedin ? { linkedin: data.profile.linkedin } : {}),
+        ...(cvUrl ? { cv_url: cvUrl } : {})
+      };
 
       let saved;
       let error;
-      ({ data: saved, error } = await supabase.from('profiles').update(payload).not('id', 'is', null).select().maybeSingle());
 
-      if (error && error.message) {
-        const optionalCols = ['about_bio', 'availability', 'email', 'linkedin', 'cv_url'];
-        for (const col of optionalCols) {
-          if (error.message.includes(col)) {
-            delete payload[col];
-          }
-        }
-        ({ data: saved, error } = await supabase.from('profiles').update(payload).not('id', 'is', null).select().maybeSingle());
+      // Step 1: Try updating with all extended columns
+      ({ data: saved, error } = await supabase.from('profiles').update(fullPayload).not('id', 'is', null).select().maybeSingle());
+
+      // Step 2: If any optional column is missing in Supabase schema cache, gracefully update with base columns
+      if (error && (error.code === 'PGRST204' || error.message?.includes('column of \'profiles\''))) {
+        console.warn('Supabase optional columns missing in database schema, saving core fields to cloud and biography to local cache:', error.message);
+        ({ data: saved, error } = await supabase.from('profiles').update(basePayload).not('id', 'is', null).select().maybeSingle());
       }
       if (error) throw error;
 
+      // Step 3: Always update local state & localStorage so UI immediately reflects everything
       data.setProfile({
         ...data.profile,
-        ...(saved || payload),
+        ...(saved || basePayload),
         aboutBio: data.profile.aboutBio,
         availability: data.profile.availability,
         email: data.profile.email,
         linkedin: data.profile.linkedin,
         cvUrl: cvUrl || data.profile.cvUrl,
-        softSkills: saved?.soft_skills || payload.soft_skills
+        softSkills: saved?.soft_skills || basePayload.soft_skills
       });
-      setNotice('Profile & Konten Biography berhasil disimpan ke Supabase.');
+      setNotice('Profile & Biography berhasil disimpan!');
       setCvFile(null);
       setProfileFile(null);
     } catch (error) {
@@ -398,29 +593,31 @@ function Admin({ data }) {
           <p className="text-gray-400 mt-2">Kelola profil, biography, experiences, project, dan artikel secara dinamis terhubung Supabase.</p>
         </div>
         <div className="flex flex-wrap gap-2 mb-8">
-          {['overview', 'profile', 'experiences', 'projects', 'articles'].map((item) => (
+          {['overview', 'profile', 'experiences', 'research', 'education', 'projects', 'articles'].map((item) => (
             <button type="button" className={tab === item ? 'btn-neon' : 'btn-muted'} onClick={() => setTab(item)} key={item}>
-              {item === 'experiences' ? 'Experiences' : item}
+              {item === 'experiences' ? 'Experiences' : item === 'research' ? 'Research' : item === 'education' ? 'Education' : item}
             </button>
           ))}
         </div>
         {notice && <div className="toast" onClick={() => setNotice('')}>{notice}</div>}
         
         {tab === 'overview' && (
-          <div className="grid md:grid-cols-4 gap-6">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
             {[
               ['Profile & Bio', 'profile', 'Ready'],
               ['Experiences', 'experiences', data.experiences?.length || 0],
+              ['Research', 'research', data.researches?.length || 0],
+              ['Education', 'education', data.educations?.length || 0],
               ['Projects', 'projects', data.projects?.length || 0],
               ['Articles', 'articles', data.articles?.length || 0]
             ].map(([title, target, val]) => (
-              <div className="admin-panel rounded-xl p-6" key={title}>
+              <div className="admin-panel rounded-xl p-5" key={title}>
                 <div className="flex items-center justify-between">
-                  <p className="text-gray-400">{title}</p>
-                  <span className="status-pill">{val}</span>
+                  <p className="text-gray-400 text-xs">{title}</p>
+                  <span className="status-pill text-[10px]">{val}</span>
                 </div>
-                <p className="text-2xl font-bold mt-5">{val}</p>
-                <button type="button" className="text-neon-blue mt-5 inline-flex items-center" onClick={() => setTab(target)}>
+                <p className="text-2xl font-bold mt-4">{val}</p>
+                <button type="button" className="text-neon-blue text-xs mt-4 inline-flex items-center hover:underline" onClick={() => setTab(target)}>
                   Kelola <span className="ml-1">→</span>
                 </button>
               </div>
@@ -618,6 +815,188 @@ function Admin({ data }) {
           </section>
         )}
 
+        {tab === 'research' && (
+          <section className="grid lg:grid-cols-2 gap-8">
+            <form onSubmit={saveResearch} className="admin-panel rounded-xl p-6 space-y-4">
+              <h2 className="text-2xl font-semibold">{editingResearchId ? 'Edit Riset / Publikasi' : 'Tambah Riset Baru'}</h2>
+              <Field
+                label="Judul Riset / Topik (e.g. Maritime Traffic Data Analysis & Prediction)"
+                value={researchItem.title}
+                onChange={(value) => setResearchItem({ ...researchItem, title: value })}
+              />
+              <Field
+                label="Institusi / Lab / Publikasi (e.g. Independent Research in Maritime Informatics · UMRAH)"
+                value={researchItem.institution}
+                onChange={(value) => setResearchItem({ ...researchItem, institution: value })}
+              />
+              <div className="grid grid-cols-2 gap-4">
+                <Field
+                  label="Periode (e.g. 2024 - 2025)"
+                  value={researchItem.period}
+                  onChange={(value) => setResearchItem({ ...researchItem, period: value })}
+                />
+                <Field
+                  label="Badge Kategori (e.g. AI & ML / Benchmark)"
+                  placeholder="AI & ML / Publication"
+                  value={researchItem.badge}
+                  onChange={(value) => setResearchItem({ ...researchItem, badge: value })}
+                />
+              </div>
+              <Field
+                label="Poin-Poin Riset (Satu baris = satu poin bullet)"
+                area
+                placeholder="Contoh:&#10;Developed predictive models for cargo vessel arrival patterns...&#10;Conducted data preprocessing and feature engineering..."
+                value={researchItem.description}
+                onChange={(value) => setResearchItem({ ...researchItem, description: value })}
+              />
+              <div className="flex gap-3 justify-end pt-2">
+                {editingResearchId && (
+                  <button type="button" className="btn-muted" onClick={resetResearchForm}>
+                    Batal
+                  </button>
+                )}
+                <button type="submit" className="btn-neon" disabled={savingResearch}>
+                  {savingResearch ? 'Menyimpan...' : (editingResearchId ? 'Update Riset' : 'Tambah Riset')}
+                </button>
+              </div>
+            </form>
+
+            <div className="admin-panel rounded-xl p-6">
+              <div className="flex items-center justify-between mb-5">
+                <h2 className="text-2xl font-semibold">Daftar Riset &amp; Publikasi</h2>
+                <span className="status-pill">{data.researches?.length || 0} Items</span>
+              </div>
+              <div className="space-y-4 max-h-[580px] overflow-y-auto pr-1">
+                {data.researches && data.researches.length > 0 ? (
+                  data.researches.map((item) => (
+                    <div className="border border-white/10 rounded-xl p-4 bg-dark-950/50" key={item.id}>
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h4 className="font-bold text-white text-sm">{item.title}</h4>
+                            {item.badge && (
+                              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-neon-purple/15 text-neon-purple border border-neon-purple/30">
+                                {item.badge}
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-xs text-neon-purple mt-0.5">{item.institution}</p>
+                          <span className="text-[11px] text-gray-400 font-mono block mt-1">{item.period}</span>
+                        </div>
+                        <div className="flex gap-2 shrink-0">
+                          <button type="button" className="text-xs text-neon-purple hover:underline" onClick={() => handleEditResearch(item)}>
+                            Edit
+                          </button>
+                          <button type="button" className="text-xs text-red-300 hover:underline" onClick={() => removeResearch(item.id)}>
+                            Hapus
+                          </button>
+                        </div>
+                      </div>
+                      <ul className="text-xs text-gray-300 list-disc list-inside mt-2 space-y-1">
+                        {(Array.isArray(item.description) ? item.description : String(item.description || '').split('\n').filter(Boolean)).map((d, dIdx) => (
+                          <li key={dIdx} className="truncate">{d}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-gray-400 text-sm">Belum ada data riset.</p>
+                )}
+              </div>
+            </div>
+          </section>
+        )}
+
+        {tab === 'education' && (
+          <section className="grid lg:grid-cols-2 gap-8">
+            <form onSubmit={saveEducation} className="admin-panel rounded-xl p-6 space-y-4">
+              <h2 className="text-2xl font-semibold">{editingEducationId ? 'Edit Pendidikan' : 'Tambah Pendidikan Baru'}</h2>
+              <Field
+                label="Jenjang / Gelar / Jurusan (e.g. Bachelor of Informatics Engineering)"
+                value={educationItem.title}
+                onChange={(value) => setEducationItem({ ...educationItem, title: value })}
+              />
+              <Field
+                label="Institusi / Universitas / Sekolah (e.g. Universitas Maritim Raja Ali Haji (UMRAH))"
+                value={educationItem.institution}
+                onChange={(value) => setEducationItem({ ...educationItem, institution: value })}
+              />
+              <div className="grid grid-cols-2 gap-4">
+                <Field
+                  label="Periode (e.g. 2022 - Present)"
+                  value={educationItem.period}
+                  onChange={(value) => setEducationItem({ ...educationItem, period: value })}
+                />
+                <Field
+                  label="Badge (e.g. Undergraduate / High School)"
+                  placeholder="Undergraduate"
+                  value={educationItem.badge}
+                  onChange={(value) => setEducationItem({ ...educationItem, badge: value })}
+                />
+              </div>
+              <Field
+                label="Deskripsi / Fokus Akademik"
+                area
+                placeholder="Tuliskan fokus kurikulum, pencapaian akademik, atau organisasi sekolah..."
+                value={educationItem.description}
+                onChange={(value) => setEducationItem({ ...educationItem, description: value })}
+              />
+              <div className="flex gap-3 justify-end pt-2">
+                {editingEducationId && (
+                  <button type="button" className="btn-muted" onClick={resetEducationForm}>
+                    Batal
+                  </button>
+                )}
+                <button type="submit" className="btn-neon" disabled={savingEducation}>
+                  {savingEducation ? 'Menyimpan...' : (editingEducationId ? 'Update Pendidikan' : 'Tambah Pendidikan')}
+                </button>
+              </div>
+            </form>
+
+            <div className="admin-panel rounded-xl p-6">
+              <div className="flex items-center justify-between mb-5">
+                <h2 className="text-2xl font-semibold">Daftar Pendidikan</h2>
+                <span className="status-pill">{data.educations?.length || 0} Items</span>
+              </div>
+              <div className="space-y-4 max-h-[580px] overflow-y-auto pr-1">
+                {data.educations && data.educations.length > 0 ? (
+                  data.educations.map((item) => (
+                    <div className="border border-white/10 rounded-xl p-4 bg-dark-950/50" key={item.id}>
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h4 className="font-bold text-white text-sm">{item.title}</h4>
+                            {item.badge && (
+                              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-neon-pink/10 text-neon-pink border border-neon-pink/20">
+                                {item.badge}
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-xs text-neon-pink mt-0.5">{item.institution}</p>
+                          <span className="text-[11px] text-gray-400 font-mono block mt-1">{item.period}</span>
+                        </div>
+                        <div className="flex gap-2 shrink-0">
+                          <button type="button" className="text-xs text-neon-pink hover:underline" onClick={() => handleEditEducation(item)}>
+                            Edit
+                          </button>
+                          <button type="button" className="text-xs text-red-300 hover:underline" onClick={() => removeEducation(item.id)}>
+                            Hapus
+                          </button>
+                        </div>
+                      </div>
+                      <p className="text-xs text-gray-300 mt-2 line-clamp-3 leading-relaxed">
+                        {Array.isArray(item.description) ? item.description.join(' ') : item.description}
+                      </p>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-gray-400 text-sm">Belum ada data pendidikan.</p>
+                )}
+              </div>
+            </div>
+          </section>
+        )}
+
         {tab === 'projects' && (
           <section className="grid lg:grid-cols-2 gap-8">
             <form onSubmit={addProject} className="admin-panel rounded-xl p-6 space-y-4">
@@ -673,5 +1052,5 @@ function Admin({ data }) {
   );
 }
 function AdminGate({ data }) { const [session, setSession] = useState(null); const [loading, setLoading] = useState(true); useEffect(() => { let active = true; if (!supabase) return setLoading(false); supabase.auth.getSession().then(({ data: result }) => { if (active) { setSession(result.session); setLoading(false); } }); const { data: listener } = supabase.auth.onAuthStateChange((_event, nextSession) => setSession(nextSession)); return () => { active = false; listener.subscription.unsubscribe(); }; }, []); if (loading) return <div className="min-h-screen flex items-center justify-center text-gray-400">Memeriksa sesi...</div>; return session ? <Admin data={data} /> : <Navigate to="/admin/login" replace />; }
-function App() { const data = useData(); return <Routes><Route path="/" element={<HomePage profile={data.profile} projects={data.projects} articles={data.articles} experiences={data.experiences} loading={data.loading} error={data.error} />} /><Route path="/admin/login" element={<Login />} /><Route path="/admin" element={<AdminGate data={data} />} /><Route path="*" element={<Navigate to="/" replace />} /></Routes>; }
+function App() { const data = useData(); return <Routes><Route path="/" element={<HomePage profile={data.profile} projects={data.projects} articles={data.articles} experiences={data.experiences} researches={data.researches} educations={data.educations} loading={data.loading} error={data.error} />} /><Route path="/admin/login" element={<Login />} /><Route path="/admin" element={<AdminGate data={data} />} /><Route path="*" element={<Navigate to="/" replace />} /></Routes>; }
 export default App;

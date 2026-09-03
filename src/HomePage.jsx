@@ -60,7 +60,52 @@ const defaultExperiences = [
   }
 ];
 
-export default function HomePage({ profile, projects, experiences = [], loading = false, error = '' }) {
+const defaultResearches = [
+  {
+    id: 1,
+    title: 'Maritime Traffic Data Analysis & Prediction',
+    badge: 'AI & ML',
+    period: '2024 - 2025',
+    institution: 'Independent Research in Maritime Informatics · UMRAH',
+    description: [
+      'Developed predictive models for cargo vessel arrival patterns utilizing Python (Pandas, NumPy, Scikit-Learn).',
+      'Conducted data preprocessing, feature engineering, and regression model accuracy evaluations to optimize archipelagic port management.',
+      'Visualized historical vessel traffic trends into interactive analytical dashboards for port authorities and operations.'
+    ]
+  },
+  {
+    id: 2,
+    title: 'Comparative Study on Flutter State Management',
+    badge: 'Benchmark',
+    period: '2024',
+    institution: 'Mobile Architecture & Performance Benchmark',
+    description: [
+      'Analyzed memory consumption efficiency and widget rendering latencies between Provider, BLoC, and Riverpod.',
+      'Formulated scalable architectural guidelines for mid-to-large scale cross-platform mobile app development.'
+    ]
+  }
+];
+
+const defaultEducations = [
+  {
+    id: 1,
+    title: 'Bachelor of Informatics Engineering',
+    badge: 'Undergraduate',
+    period: '2022 - Present',
+    institution: 'Universitas Maritim Raja Ali Haji (UMRAH) · Tanjungpinang, Indonesia',
+    description: 'Pursuing an in-depth curriculum in software engineering, data structures & algorithms, relational database systems, object-oriented programming (OOP), artificial intelligence, and applied maritime informatics architecture. Actively honing hands-on engineering skills through university lab projects and independent software initiatives.'
+  },
+  {
+    id: 2,
+    title: 'Senior High School (Natural Sciences)',
+    badge: 'High School',
+    period: '2018 - 2021',
+    institution: 'SMAN 04 Karimun · Tanjung Balai Karimun, Indonesia',
+    description: 'Focused on Mathematics and Natural Sciences (MIPA), building a solid foundation in analytical thinking, algorithmic problem solving, and student council leadership.'
+  }
+];
+
+export default function HomePage({ profile, projects, experiences = [], researches = [], educations = [], loading = false, error = '' }) {
   const [activeNav, setActiveNav] = useState('home');
   const [mobileMenu, setMobileMenu] = useState(false);
   const [cursor, setCursor] = useState({ x: -100, y: -100 });
@@ -532,10 +577,19 @@ export default function HomePage({ profile, projects, experiences = [], loading 
               </div>
 
               {/* ── SISI KANAN: Box Interactive Journey / Experience (Jauh Lebih Lebar) ── */}
-              <div className="kartu-transparan rounded-2xl p-6 md:p-8 flex flex-col justify-between h-full">
+              <div className="kartu-transparan rounded-2xl p-6 md:p-8 lg:p-9 flex flex-col justify-between h-full">
                 {/* Interactive Navigation Tabs */}
-                <div className="flex flex-wrap items-center justify-between gap-2.5 mb-6 pb-4 border-b border-neon-blue/20">
-                  <div className="flex flex-wrap items-center gap-2">
+                <div
+                  className="flex flex-wrap items-center justify-between gap-3 mb-7 pb-4 border-b transition-colors duration-300"
+                  style={{
+                    borderColor: activeAboutTab === 'experience'
+                      ? 'rgba(0, 240, 255, 0.25)'
+                      : activeAboutTab === 'research'
+                      ? 'rgba(167, 139, 250, 0.25)'
+                      : 'rgba(244, 114, 182, 0.25)'
+                  }}
+                >
+                  <div className="flex flex-wrap items-center gap-2.5">
                     {[
                       { id: 'experience', label: 'Experience', icon: 'fa-solid fa-briefcase', color: '#00f0ff' },
                       { id: 'research',   label: 'Research',   icon: 'fa-solid fa-flask-vial', color: '#a78bfa' },
@@ -567,33 +621,33 @@ export default function HomePage({ profile, projects, experiences = [], loading 
                 </div>
 
                 {/* Tab Content Display Area with Smooth Scrollbar if long */}
-                <div className="custom-about-scroll overflow-y-auto max-h-[580px] pr-1.5 flex flex-col gap-5">
+                <div className="custom-about-scroll overflow-y-auto max-h-[600px] pr-2 flex flex-col gap-6">
 
                   {/* 1. PROFESSIONAL EXPERIENCE */}
                   {activeAboutTab === 'experience' && (
-                    <div className="flex flex-col gap-4 animate-fadeIn">
+                    <div className="flex flex-col gap-5 animate-fadeIn text-left">
                       {(experiences && experiences.length > 0 ? experiences : defaultExperiences).map((item, idx) => (
-                        <div key={item.id || idx} className={`about-timeline-card border-l-2 ${idx === 0 ? 'border-neon-blue' : 'border-cyan-400/60'}`}>
-                          <div className="flex flex-wrap items-center justify-between gap-2 mb-1.5">
-                            <h4 className="text-base font-bold text-white flex items-center gap-2">
-                              <span>{item.title}</span>
+                        <div key={item.id || idx} className="about-timeline-card border-l-[3.5px] border-neon-blue text-left shadow-lg shadow-neon-blue/5">
+                          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-2.5 text-left">
+                            <h4 className="text-base font-bold text-white flex flex-wrap items-center gap-2.5 text-left justify-start">
+                              <span className="text-left">{item.title}</span>
                               {item.badge && (
-                                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-neon-blue/10 text-neon-blue border border-neon-blue/20">
+                                <span className="text-[11px] font-mono px-3 py-1 rounded-md bg-neon-blue/10 text-neon-blue border border-neon-blue shrink-0 font-semibold tracking-wide">
                                   {item.badge}
                                 </span>
                               )}
                             </h4>
-                            <span className={`text-xs font-mono font-semibold ${idx === 0 ? 'text-neon-blue' : 'text-gray-400'}`}>
+                            <span className="text-xs font-mono font-semibold shrink-0 text-left sm:text-right text-neon-blue">
                               {item.period}
                             </span>
                           </div>
-                          <p className="text-xs font-semibold text-gray-400 mb-3 flex items-center gap-1.5">
-                            <i className={`fa-solid ${idx === 0 ? 'fa-building text-neon-blue' : 'fa-network-wired text-cyan-400'} text-xs`} />
-                            <span>{item.company}</span>
+                          <p className="text-xs font-semibold text-neon-blue/90 mb-3.5 flex items-center gap-2 text-left justify-start">
+                            <i className="fa-solid fa-building text-neon-blue text-xs shrink-0" />
+                            <span className="text-left">{item.company}</span>
                           </p>
-                          <ul className="text-xs text-gray-300 space-y-2 list-disc list-inside leading-relaxed text-justify">
+                          <ul className="text-xs text-gray-300 space-y-2.5 list-disc list-inside leading-relaxed text-left">
                             {(Array.isArray(item.description) ? item.description : String(item.description || '').split('\n').filter(Boolean)).map((desc, dIdx) => (
-                              <li key={dIdx}>{desc}</li>
+                              <li key={dIdx} className="text-left">{desc}</li>
                             ))}
                           </ul>
                         </div>
@@ -603,88 +657,94 @@ export default function HomePage({ profile, projects, experiences = [], loading 
 
                   {/* 2. RESEARCH & PUBLICATIONS */}
                   {activeAboutTab === 'research' && (
-                    <div className="flex flex-col gap-4 animate-fadeIn">
-                      <div className="about-timeline-card border-l-2 border-neon-purple">
-                        <div className="flex flex-wrap items-center justify-between gap-2 mb-1.5">
-                          <h4 className="text-base font-bold text-white flex items-center gap-2">
-                            <span>Maritime Traffic Data Analysis &amp; Prediction</span>
-                            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-neon-purple/15 text-neon-purple border border-neon-purple/30">AI &amp; ML</span>
-                          </h4>
-                          <span className="text-xs font-mono text-neon-purple font-semibold">2024 - 2025</span>
+                    <div className="flex flex-col gap-5 animate-fadeIn text-left">
+                      {(researches && researches.length > 0 ? researches : defaultResearches).map((item, idx) => (
+                        <div key={item.id || idx} className="about-timeline-card border-l-[3.5px] border-neon-purple text-left shadow-lg shadow-neon-purple/5">
+                          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-2.5 text-left">
+                            <h4 className="text-base font-bold text-white flex flex-wrap items-center gap-2.5 text-left justify-start">
+                              <span className="text-left">{item.title}</span>
+                              {item.badge && (
+                                <span className="text-[11px] font-mono px-3 py-1 rounded-md bg-neon-purple/10 text-neon-purple border border-neon-purple shrink-0 font-semibold tracking-wide">
+                                  {item.badge}
+                                </span>
+                              )}
+                            </h4>
+                            <span className="text-xs font-mono font-semibold shrink-0 text-left sm:text-right text-neon-purple">
+                              {item.period}
+                            </span>
+                          </div>
+                          <p className="text-xs font-semibold text-neon-purple/90 mb-3.5 flex items-center gap-2 text-left justify-start">
+                            <i className="fa-solid fa-microchip text-neon-purple text-xs shrink-0" />
+                            <span className="text-left">{item.institution || item.company}</span>
+                          </p>
+                          <ul className="text-xs text-gray-300 space-y-2.5 list-disc list-inside leading-relaxed text-left">
+                            {(Array.isArray(item.description) ? item.description : String(item.description || '').split('\n').filter(Boolean)).map((desc, dIdx) => (
+                              <li key={dIdx} className="text-left">{desc}</li>
+                            ))}
+                          </ul>
                         </div>
-                        <p className="text-xs font-semibold text-gray-400 mb-3 flex items-center gap-1.5">
-                          <i className="fa-solid fa-microchip text-neon-purple text-xs" />
-                          <span>Independent Research in Maritime Informatics · UMRAH</span>
-                        </p>
-                        <ul className="text-xs text-gray-300 space-y-2 list-disc list-inside leading-relaxed text-justify">
-                          <li>Developed predictive models for cargo vessel arrival patterns utilizing Python (Pandas, NumPy, Scikit-Learn).</li>
-                          <li>Conducted data preprocessing, feature engineering, and regression model accuracy evaluations to optimize archipelagic port management.</li>
-                          <li>Visualized historical vessel traffic trends into interactive analytical dashboards for port authorities and operations.</li>
-                        </ul>
-                      </div>
-
-                      <div className="about-timeline-card border-l-2 border-purple-400/60">
-                        <div className="flex flex-wrap items-center justify-between gap-2 mb-1.5">
-                          <h4 className="text-base font-bold text-white">Comparative Study on Flutter State Management</h4>
-                          <span className="text-xs font-mono text-gray-400 font-semibold">2024</span>
-                        </div>
-                        <p className="text-xs font-semibold text-gray-400 mb-3 flex items-center gap-1.5">
-                          <i className="fa-solid fa-layer-group text-purple-400 text-xs" />
-                          <span>Mobile Architecture &amp; Performance Benchmark</span>
-                        </p>
-                        <ul className="text-xs text-gray-300 space-y-2 list-disc list-inside leading-relaxed text-justify">
-                          <li>Analyzed memory consumption efficiency and widget rendering latencies between Provider, BLoC, and Riverpod.</li>
-                          <li>Formulated scalable architectural guidelines for mid-to-large scale cross-platform mobile app development.</li>
-                        </ul>
-                      </div>
+                      ))}
                     </div>
                   )}
 
                   {/* 3. FORMAL EDUCATION */}
                   {activeAboutTab === 'education' && (
-                    <div className="flex flex-col gap-4 animate-fadeIn">
-                      <div className="about-timeline-card border-l-2 border-neon-pink">
-                        <div className="flex flex-wrap items-center justify-between gap-2 mb-1.5">
-                          <h4 className="text-base font-bold text-white flex items-center gap-2">
-                            <span>Bachelor of Informatics Engineering</span>
-                            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-neon-pink/10 text-neon-pink border border-neon-pink/20">Undergraduate</span>
-                          </h4>
-                          <span className="text-xs font-mono text-neon-pink font-semibold">2022 - Present</span>
+                    <div className="flex flex-col gap-5 animate-fadeIn text-left">
+                      {(educations && educations.length > 0 ? educations : defaultEducations).map((item, idx) => (
+                        <div key={item.id || idx} className="about-timeline-card border-l-[3.5px] border-neon-pink text-left shadow-lg shadow-neon-pink/5">
+                          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-2.5 text-left">
+                            <h4 className="text-base font-bold text-white flex flex-wrap items-center gap-2.5 text-left justify-start">
+                              <span className="text-left">{item.title}</span>
+                              {item.badge && (
+                                <span className="text-[11px] font-mono px-3 py-1 rounded-md bg-neon-pink/10 text-neon-pink border border-neon-pink shrink-0 font-semibold tracking-wide">
+                                  {item.badge}
+                                </span>
+                              )}
+                            </h4>
+                            <span className="text-xs font-mono font-semibold shrink-0 text-left sm:text-right text-neon-pink">
+                              {item.period}
+                            </span>
+                          </div>
+                          <p className="text-xs font-semibold text-neon-pink/90 mb-3.5 flex items-center gap-2 text-left justify-start">
+                            <i className="fa-solid fa-university text-neon-pink text-xs shrink-0" />
+                            <span className="text-left">{item.institution || item.company}</span>
+                          </p>
+                          <p className="text-xs text-gray-300 leading-relaxed text-left">
+                            {Array.isArray(item.description) ? item.description.join(' ') : item.description}
+                          </p>
                         </div>
-                        <p className="text-xs font-semibold text-gray-400 mb-3 flex items-center gap-1.5">
-                          <i className="fa-solid fa-university text-neon-pink text-xs" />
-                          <span>Universitas Maritim Raja Ali Haji (UMRAH) · Tanjungpinang, Indonesia</span>
-                        </p>
-                        <p className="text-xs text-gray-300 leading-relaxed text-justify">
-                          Pursuing an in-depth curriculum in software engineering, data structures &amp; algorithms, relational database systems, object-oriented programming (OOP), artificial intelligence, and applied maritime informatics architecture. Actively honing hands-on engineering skills through university lab projects and independent software initiatives.
-                        </p>
-                      </div>
-
-                      <div className="about-timeline-card border-l-2 border-pink-400/60">
-                        <div className="flex flex-wrap items-center justify-between gap-2 mb-1.5">
-                          <h4 className="text-base font-bold text-white">Senior High School (Natural Sciences)</h4>
-                          <span className="text-xs font-mono text-gray-400 font-semibold">2018 - 2021</span>
-                        </div>
-                        <p className="text-xs font-semibold text-gray-400 mb-3 flex items-center gap-1.5">
-                          <i className="fa-solid fa-school text-pink-400 text-xs" />
-                          <span>SMAN 04 Karimun · Tanjung Balai Karimun, Indonesia</span>
-                        </p>
-                        <p className="text-xs text-gray-300 leading-relaxed text-justify">
-                          Focused on Mathematics and Natural Sciences (MIPA), building a solid foundation in analytical thinking, algorithmic problem solving, and student council leadership.
-                        </p>
-                      </div>
+                      ))}
                     </div>
                   )}
 
                 </div>
 
                 {/* Bottom Status Footer */}
-                <div className="pt-4 mt-5 border-t border-neon-blue/15 flex items-center justify-between text-xs text-gray-400">
+                <div
+                  className="pt-5 mt-7 border-t flex items-center justify-between text-xs text-gray-400 transition-colors duration-300"
+                  style={{
+                    borderColor: activeAboutTab === 'experience'
+                      ? 'rgba(0, 240, 255, 0.2)'
+                      : activeAboutTab === 'research'
+                      ? 'rgba(167, 139, 250, 0.2)'
+                      : 'rgba(244, 114, 182, 0.2)'
+                  }}
+                >
                   <span className="flex items-center gap-2">
-                    <i className="fa-solid fa-circle-check text-neon-blue" />
-                    <span>Verified Academic & Experience Track</span>
+                    <i
+                      className="fa-solid fa-circle-check transition-colors duration-300"
+                      style={{
+                        color: activeAboutTab === 'experience' ? '#00f0ff' : activeAboutTab === 'research' ? '#a78bfa' : '#f472b6'
+                      }}
+                    />
+                    <span>Verified Academic &amp; Experience Track</span>
                   </span>
-                  <span className="font-mono text-neon-blue text-[11px] uppercase tracking-wider">
+                  <span
+                    className="font-mono text-[11px] uppercase tracking-wider font-semibold transition-colors duration-300"
+                    style={{
+                      color: activeAboutTab === 'experience' ? '#00f0ff' : activeAboutTab === 'research' ? '#a78bfa' : '#f472b6'
+                    }}
+                  >
                     {activeAboutTab.toUpperCase()} OVERVIEW
                   </span>
                 </div>
