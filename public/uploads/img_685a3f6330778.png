@@ -1,0 +1,362 @@
+use strict;
+use warnings;
+package Test::CleanNamespaces; # git description: v0.23-5-gf8e88b1
+# ABSTRACT: Check for uncleaned imports
+# KEYWORDS: testing namespaces clean dirty imports exports subroutines methods
+
+our $VERSION = '0.24';
+
+use Module::Runtime ();
+use Sub::Identify ();
+use Package::Stash 0.14;
+use Test::Builder;
+use File::Find ();
+use File::Spec;
+
+use Exporter 5.57 'import';
+our @EXPORT = qw(namespaces_clean all_namespaces_clean);
+
+#pod =head1 SYNOPSIS
+#pod
+#pod     use strict;
+#pod     use warnings;
+#pod     use Test::CleanNamespaces;
+#pod
+#pod     all_namespaces_clean;
+#pod
+#pod =head1 DESCRIPTION
+#pod
+#pod This module lets you check your module's namespaces for imported functions you
+#pod might have forgotten to remove with L<namespace::autoclean> or
+#pod L<namespace::clean> and are therefore available to be called as methods, which
+#pod usually isn't want you want.
+#pod
+#pod =head1 FUNCTIONS
+#pod
+#pod All functions are exported by default.
+#pod
+#pod =head2 namespaces_clean
+#pod
+#pod     namespaces_clean('YourModule', 'AnotherModule');
+#pod
+#pod Tests every specified namespace for uncleaned imports. If the module couldn't
+#pod be loaded it will be skipped.
+#pod
+#pod =head2 all_namespaces_clean
+#pod
+#pod     all_namespaces_clean;
+#pod
+#pod Runs L</namespaces_clean> for all modules in your distribution.
+#pod
+#pod =cut
+
+sub namespaces_clean {
+    my (@namespaces) = @_;
+    local $@;
+    my $builder = builder();
+
+    my $result = 1;
+    for my $ns (@namespaces) {
+        unless (eval { Module::Runtime::require_module($ns); 1 }) {
+            $builder->skip("failed to load ${ns}: $@");
+            next;
+        }
+
+        my $imports = _remaining_imports($ns);
+
+        my $ok = $builder->ok(!keys(%$imports), "${ns} contains no imported functions");
+        $ok or $builder->diag($builder->explain('remaining imports: ' => $imports));
+
+        $result &&= $ok;
+    }
+
+    return $result;
+}
+
+sub all_namespaces_clean {
+    my @modules = find_modules(@_);
+    builder()->plan(tests => scalar @modules);
+    namespaces_clean(@modules);
+}
+
+# given a package name, returns a hashref of all remaining imports
+sub _remaining_imports {
+    my $ns = shift;
+
+    my $symbols = Package::Stash->new($ns)->get_all_symbols('CODE');
+    my @imports;
+
+    my $meta;
+    if ($INC{ Module::Runtime::module_notional_filename('Class::MOP') }
+        and $meta = Class::MOP::class_of($ns)
+        and $meta->can('get_method_list'))
+    {
+        my %subs = %$symbols;
+        delete @subs{ $meta->get_method_list };
+        @imports = keys %subs;
+    }
+    elsif ($INC{ Module::Runtime::module_notional_filename('Mouse::Util') }
+        and Mouse::Util->can('class_of') and $meta = Mouse::Util::class_of($ns))
+    {
+        warn 'Mouse class detected - chance of false negatives is high!';
+
+        my %subs = %$symbols;
+        # ugh, this returns far more than the true list of methods
+        delete @subs{ $meta->get_method_list };
+        @imports = keys %subs;
+    }
+    else
+    {
+        @imports = grep {
+            my $stash = Sub::Identify::stash_name($symbols->{$_});
+            $stash ne $ns
+                and $stash ne 'Role::Tiny'
+                and not eval { require Role::Tiny; Role::Tiny->is_role($stash) }
+        } keys %$symbols;
+    }
+
+    my %imports; @imports{@imports} = map { Sub::Identify::sub_fullname($symbols->{$_}) } @imports;
+
+    # these subs are special-cased - they are often provided by other
+    # modules, but cannot be wrapped with Sub::Name as the call stack
+    # is important
+    delete @imports{qw(import unimport)};
+
+    my @overloads = grep { $imports{$_} eq 'overload::nil' || $imports{$_} eq 'overload::_nil' } keys %imports;
+    delete @imports{@overloads} if @overloads;
+
+    if ("$]" < 5.020)
+    {
+        # < haarg> 5.10+ allows sticking a readonly scalar ref directly in the symbol table, rather than a glob.  when auto-promoted to a sub, it will have the correct name.
+        # < haarg> but that only works if the symbol table entry is empty
+        # < haarg> if it exists, it has to use the *$const = sub () { $val } method, so the name is __ANON__
+        # < haarg> newer versions don't use that method
+        # < haarg> rather, newer versions of constant.pm don't use that method
+        # < haarg> and then the name ends up being YourPackage::__ANON__
+        my @constants = grep { $imports{$_} eq 'constant::__ANON__' } keys %imports;
+        delete @imports{@constants} if @constants;
+    }
+
+    return \%imports;
+}
+
+#pod =head2 find_modules
+#pod
+#pod     my @modules = Test::CleanNamespaces->find_modules;
+#pod
+#pod Returns a list of modules in the current distribution. It'll search in
+#pod C<blib/>, if it exists. C<lib/> will be searched otherwise.
+#pod
+#pod =cut
+
+sub find_modules {
+    my @modules;
+    for my $top (-e 'blib' ? ('blib/lib', 'blib/arch') : 'lib') {
+        File::Find::find({
+            no_chdir => 1,
+            wanted => sub {
+                my $file = $_;
+                return
+                    unless $file =~ s/\.pm$//;
+                push @modules, join '::' => File::Spec->splitdir(
+                    File::Spec->abs2rel(File::Spec->rel2abs($file, '.'), $top)
+                );
+            },
+        }, $top);
+    }
+    return @modules;
+}
+
+#pod =head2 builder
+#pod
+#pod     my $builder = Test::CleanNamespaces->builder;
+#pod
+#pod Returns the C<Test::Builder> used by the test functions.
+#pod
+#pod =cut
+
+{
+    my $Test = Test::Builder->new;
+    sub builder { $Test }
+}
+
+1;
+
+__END__
+
+=pod
+
+=encoding UTF-8
+
+=head1 NAME
+
+Test::CleanNamespaces - Check for uncleaned imports
+
+=head1 VERSION
+
+version 0.24
+
+=head1 SYNOPSIS
+
+    use strict;
+    use warnings;
+    use Test::CleanNamespaces;
+
+    all_namespaces_clean;
+
+=head1 DESCRIPTION
+
+This module lets you check your module's namespaces for imported functions you
+might have forgotten to remove with L<namespace::autoclean> or
+L<namespace::clean> and are therefore available to be called as methods, which
+usually isn't want you want.
+
+=head1 FUNCTIONS
+
+All functions are exported by default.
+
+=head2 namespaces_clean
+
+    namespaces_clean('YourModule', 'AnotherModule');
+
+Tests every specified namespace for uncleaned imports. If the module couldn't
+be loaded it will be skipped.
+
+=head2 all_namespaces_clean
+
+    all_namespaces_clean;
+
+Runs L</namespaces_clean> for all modules in your distribution.
+
+=head2 find_modules
+
+    my @modules = Test::CleanNamespaces->find_modules;
+
+Returns a list of modules in the current distribution. It'll search in
+C<blib/>, if it exists. C<lib/> will be searched otherwise.
+
+=head2 builder
+
+    my $builder = Test::CleanNamespaces->builder;
+
+Returns the C<Test::Builder> used by the test functions.
+
+=head1 KNOWN ISSUES
+
+Uncleaned imports from L<Mouse> classes are incompletely detected, due to its
+lack of ability to return the correct method list -- it assumes that all subs
+are meant to be callable as methods unless they originated from (were imported
+by) one of: L<Mouse>, L<Mouse::Role>, L<Mouse::Util>,
+L<Mouse::Util::TypeConstraints>, L<Carp>, L<Scalar::Util>, or L<List::Util>.
+
+=head1 SEE ALSO
+
+=over 4
+
+=item *
+
+L<namespace::clean>
+
+=item *
+
+L<namespace::autoclean>
+
+=item *
+
+L<namespace::sweep>
+
+=item *
+
+L<Sub::Exporter::ForMethods>
+
+=item *
+
+L<Test::API>
+
+=item *
+
+L<Sub::Name>
+
+=item *
+
+L<Sub::Install>
+
+=item *
+
+L<MooseX::MarkAsMethods>
+
+=item *
+
+L<Dist::Zilla::Plugin::Test::CleanNamespaces>
+
+=back
+
+=head1 SUPPORT
+
+Bugs may be submitted through L<the RT bug tracker|https://rt.cpan.org/Public/Dist/Display.html?Name=Test-CleanNamespaces>
+(or L<bug-Test-CleanNamespaces@rt.cpan.org|mailto:bug-Test-CleanNamespaces@rt.cpan.org>).
+
+There is also a mailing list available for users of this distribution, at
+L<http://lists.perl.org/list/perl-qa.html>.
+
+There is also an irc channel available for users of this distribution, at
+L<C<#perl> on C<irc.perl.org>|irc://irc.perl.org/#perl-qa>.
+
+=head1 AUTHOR
+
+Florian Ragwitz <rafl@debian.org>
+
+=head1 CONTRIBUTORS
+
+=for stopwords Karen Etheridge Graham Knop
+
+=over 4
+
+=item *
+
+Karen Etheridge <ether@cpan.org>
+
+=item *
+
+Graham Knop <haarg@haarg.org>
+
+=back
+
+=head1 COPYRIGHT AND LICENCE
+
+This software is copyright (c) 2009 by Florian Ragwitz.
+
+This is free software; you can redistribute it and/or modify it under
+the same terms as the Perl 5 programming language system itself.
+
+=cut
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           `p°î;ßï5óıŠ;|øğ& ÇdÇ(’ üğ‡?üĞ²ÕŸC¦3qôO~“®áÚ‹½ÕõssoØ´iÓ»²cˆR" €ë2!º  oIDATêª#eÇ@ó·ÏÔßõ£ê(/l­DGıä‹-*pBv€B	À®]»VÉb·µÜÆæ2Kvíºu„ú7sRK^î‰*À±²’Ú€ZÛËRëjjj¾(**ª”G”	€eYµ,X-;Šİ¢µêÏıgeh˜ÏÑ?uœª •µ+¶ªŸ„Ói{÷î}ß0%V  Š$  Uš¦©ÄöˆÔ6¯Œşg\•Ê‘uŠWª ‹>j û§¼cÉ’%+UY¨“ œ €6¼*;jGÿ”X 'ÕÔÔ|QXXXEV  ê$ 0£vôèÑ5MS™5’t&Ë(­àèŸ’C^‚ê'‘¬xÃ«¯¾úxäJ4 
+% Ñ²È»ï¾[(;j™¡køİ*ş)yxaûèÊÚÆí¸I]555_Ìš5k‹Jóÿ€B	 €
+ ˜4iÒû¬¨É+£ÿ[
+R8ú'Gäçz£
+à…¹’Ytô¯Òü? V€hvÄ*€š–|¬şºÿ¬·Ô9"Çx¡
+PZacÍNõ“ódTYY¹qÖ¬Y["VH¦¥ Ë² §ª \ Ò
+«w˜²Ãh×-)<÷œuI?U êËxã7NpU¢Ú»:lF7!DÓ47\sí·îĞ5–rU°peÊ«=°NKÕğÈm)v€õr®iHKÕğ¿Ÿ« WÈË10 ‹ù¯*vlßşìÄ‰ß !Än J•Q•{§D« ………e_ñÎC²ãIv–-p¸Nxbô×(şÉcÈËQÿ­Å*€:*++7^zé¥Ï§FÿÊtÿG©ø>-•Lš4éıİ»w¿"; dfè~ÿú7•´TÎı“»¼p¨Ti…­åü5-¶ìûï¿ÿgÑ-ËRòÈ{€SU  ˜<yòSìÇ+£ÿ	ùşÉU^©xa£.?³lEzáMöüß'5 6¨ÖuªàĞ¡C&ûäys£‰Í{Ôî.NKÕğ³É]Ğ­ßä®Ìnºò½ _˜8,…¿’4÷Prô¨› @QMÖ®]{´_¿¾ë‡¿•I@b=õTW{—±[†§àšoª¿o;y_¿^>úÂRşw"#MÃĞ\eoï¾µ{÷îWüT“O•@±Æ¿¦”®g5
+˜5kÖ–şøü÷¸åeâ”VØ(­P{>1-UÃíWª¿g;ùƒ¡k8bZõ*…íŞ½û•¼¼¼ÿiò©}P°ñ¯)¥ 4~óNÍŸ0	H¬[Õ¿‰LÈ ;U!JœIde¨ıóBòî'Íş‘Fv¥6ıi‰jDÇ£S °lÙ²¯9à>Ëxâï8qRv$mûÅmAÎuRÂ¥¥høäKµ{cR#/ğÂ-ŞÛZùC±]V<¡z @ãŠ¦»(±à¾mû*kÕşş^{1Gÿ$Ç„|Cù*À‡;Õ¯ày]K4Îû{‚'  ± ¥$ ¶XçrÁŞ#ê[ï½NıuÙäO†®aÆUj¿ÿ*kxtÏ¶mÛmåá¯ô¼SI  œh)	ø×Ó&ÔÔÔ|!30?ÚS©ö}ƒ£’mü%š­zà@µæ¥{¼'X¶ÀòåËŠîò×„§ş€·  1	8cMeQQQåÕW_}ÏÁƒWÉ
+ÊT_æ4u´úØäoÁC¿¥@í÷áşjµ½Æ4ÍªŸÏûÙm“&Mz¿Ù_yîáx/ˆÚÔ´P\\êÓ§ÏÃëÖ­ûoö8Cå
+Àµ<±#ùßm#u;-Uİ*@¹Â¿Ç^SYY¹qÄˆ7–5û+O>üï& gõ ÀèÑ£ÿÊ¾ g<ªn"ÅÑ?©"˜bèwR÷ıxô„º¿Ç^²mÛ¶g³³³ï-..5û+Ï>ü' ˆL4O¢}<? óBaË®oPóÆQ0Ğû±SòP¹
+°[ñ#¼U×Æ|?àñ‡?àí À©S–Î8l¡¨¨¨rÄˆ3ØĞ9u!]Ù÷ÅŒ1jw^SòQ¹
+PÃ
+@§µ6ßtn‚Çş€€ˆ
+4KØĞ9*¯
+ÈÏõË[–üä†¡¨Z km¾ß0ŒZUöí?İM+ĞÂìèC×PW¯fÀÑ?©*;]Ã„|HåmÌ÷ïóÓÃğW 4–d6µÖÀı¼‹£RİíW¦(W¨©™Ì«(¶ìvæû•ßÛ¿£|yGm­/ gÏwíŞ½ûIaQ8ú'Õe§kPµ€ÚfšfÕ/ñóïøy¾¿%¾L "Îê €¼¼¼ÿÙ¶mÛ³âñŒºæ…/É¦\ÂÑ?yÂ£¸G…×˜¦Y:}úô»ü>ßß¿¿S[ì¸ôÒKŸ[·nİKˆ‡:(+CÃ÷®1Ø¿A`èî¿¡‹ì0N9®X2¯šššš/FŒ1£¨¨¨²Ù_ùn¾¿%~O €VúfÏ½lùòå©Üõ.ƒjßû¯ï‚`Š‘ïSò‰ü\S.çT€ê*++7^}õÕ÷´²¹ïæû[’47Öæ}ÅÅÅ¡I“&½ÿ÷ï0	hÂĞ5Ô*²
+ ` ±ƒx9yÏ÷®1”8(HÕ½d;xğàªæş~ŸïoIÒ$ gM	Lš4éışøü÷˜¨%+CÃÃ7«SJ%êˆC×çŞ”5cÙ\Õ§OŸ‡›~>æû[’l	 Ğ˜İ‘Ìš5kËßW¼ó¤x¨™¬OßÆã~É³]C~®Gn“ŸppsZuÕ‘ÍşH’ùş–$c ´Lš4é}66’¹}hV††ÂÛƒ|ø“/ŒdHOÂ–Í&Z46ü]wİu?iöé}H’ùş–$k ´Œ=ú¯Ü'@èÃŸË¨ÈOTH’iš¥÷Ş{ï›5ü%õÃHî ha…@^^Şÿğ¡ÄãÃŸülì ? §§EåÃ½!¶ìéÓ§ÿ°ÙR¿¤øL   –ehúqŸ>}æ¶Á‰“—£ãé»Óøğ'_›TÀÓÓ”Û.ØÏ,[à—¿øùwøğoï¸N qùÇ)÷Ş{ï“µy&‘= ×^ÀSw§Úœó§dŸ«ã·3YéJ”õŸ~òßÍvøãÃ¿	¾Ïtª' ¨¨¨’+Ü5åòÌ›Ì~(¹äåèxêîT»``bö¸PõtO·UVVn=zô_›|Šÿfxã=Ó“&MzŸMÎKKÕğÈmAÜw=ø¡äL1ô_MrÇ@—˜¦Yuÿı÷ÿ,úq¤Ï‹ÿf˜ œíšì8yòä§LÓ,•OÂuq
+ +CÃog¹Ã€û®OÅO'ta_€Ã^|ñÅ‡¢óşÉºÉO,xnÙq €ŒC‡™¦in¸æÚoİ¡kÉñKº¡ÔÂçœ_:\0ĞÀc·Ñ¯óN¢¨oôÖ1¤ŸÏÊ,œ8éüõ¯½8çõH{ lÛ¶íÙ‰'¾ıX±]f<*ã¸uÑå………eŸïØÎ#„ãpíÅ<~gnğCÔ‚ü\®„q‚išU—^zésM>uÖi°tßmmhº<pÚ´i‹LÓ¬’W}w\*æMîCçÃŸ¨5Ùéın×^Šg½øâ‹M·÷!‰öéN´-Œ&SW\qÅşo|ã7ÈÊmNM¤¥j˜79ˆI¼¡ÅB×4\=8€€®aóË‘kº(€YşëE÷}hœ÷Bì•“êüÿ®ˆß©©€I“&½_YY¹Qv@^—£³Ù¨“¦]•‚Gn:Ò˜‘æÿÊ›e<ñÄ…§>fÓ_Lxw¢
+@o ÛüŞXQ+ğÉ—}4ğ«©©vv†áßo‘Ëdé¸òBë¾Œ¯9ğq©èÖÅß¿Š;¶ovêÔ©ïG>,Acõ–ÚÁ
+@ìöå{Ê|½7ÀÅ};ÿ¶˜ry
+¿“›û9!ºMvg7ÊËÑ}ßx
+[ö´iÓ§ÖûsŞ?F¼IÇîÔTÀœ9s^ôó6Áy9z§n8?Ğ÷]ŸÊf?"e§kxüÎ.Ú4èÖşßhhóÆõÿ/zÊ_ós]¨m¼SwLW ƒ ´´ô¡óÏ?ÿNÉñ¸Â²ª÷ÿ¹•µí':YæŞD~.óI"7½½ÙÄ“+b›¸öâ æM–sa¢„Â–}ÅeÃÇF nõÛA¼cwÌ©]ı\0tÙéõ¬Œ¶sÄ‚¾;¢ˆ(ØŞïåµ0çÿoµıåÎÏÿıƒÿc s†Àïİ»÷xÙÁ¸)¶ì××Ûú[›ÃgTòrtÜ:"…Küˆ$°lWÖ™øßÏM”V4.ÙMKÕpå…Æ}3«o,[`xÁ°«8úï<& “ ßœ9s>öØc¯Ë&Q×5& éAÛf“‘BaË²l‘4=8Û¶m{öÒK/}{ıw^r¼SÜ1 >üû¬¬¬ËdCD”,,[`ÚÔ»nŒøSvşw
+Gq· ŞxãgdBD”LÊ÷”½RTTTÉeñaĞy 0kÖ¬-<#€ˆ(qV­Zµ ,Ëª•‹—1ˆÏ> ())yUv DDÉÀ4ÍªY³fm‰|ÈÆ¿80ˆO ,Y²d¥ì@ˆˆ’A“×>©ø €øí+,,,«©©ùBv DD~×dÀÅÑœ˜ Äï ìØ±c©ì@ˆˆüÌ4ÍÒÂÂÂ2pôï& ñ;aFí‚Vûug@""lØ°!Zş?&5Ÿ`à Ë²j‹ŠŠ*««l”‘_-X°`5—ş9‡	€3* àÓO?-’‘ÕÔÔ|QTTTÉ¥ÎaàÃ0jçÎû1§ˆˆœeÙ¢iŸ›ÿÂÀ!–eÕ‡*}½Jv,DD~3{öìe‘ò?9„	€s* `Ó¦MïÊ„ˆÈOª«l,..±üï,& 2£vÒ¤IïGOç""¢ø5é¯bùßAL dYÖ 8¸¯œ[9À²æÎû1ËÿÎcà¬Àéƒ*ˆˆ(>‡¾^)ÿ‹ß0pŞ¾Y³fmá4 QüŞ~ûí¿DşÈµÿcà¼c §ˆˆâ
+[ö¬Y³¶°üï& Î; Ï=÷Ü_eBDäeÑËÿî`à}………e¦i–Ê„ˆÈ«šôS±üï& î8 %%%ÿ‘×X¶€išU³fÍÚüç& î8aFm“s«‰ˆ(F†®¡¤¤„'ÿ¹Œ	€K,Ëª-,,,«©©ùBv,DD^³dÉ’•<ùÏ]L ÜS éDDƒššš/
+Ë¸õ¯»˜ ¸È0ŒÚ¬æ	DD±ãÉ‰¡ÉÀçr ô;pàÀã½{÷/;""ÕY¶Àğ‚aWmß¾½Â²¬/eÇãg¬ ¸« zê©gdBDäŸïØş,OşK& .3£¶°°°ìàÁƒ«dÇBD¤2Ë˜?ş‘Yşw —Ew°b€ˆ¨u–-P¾§ì•¢¢¢Jnı›L Üw X "jÛœ9s^—QË%0HŒ} « DD­‰ş#²üŸ \8Ã ´´ô¡óÏ?ÿNÙÁ©"¶ì+.>¶¸¸8„Æ€` qöÀäÉ“Ÿ2M³Jv0DDªXô§~yø|ø'Œ!;€$r@ïC‡™ıû÷ÿç°‚á·ê0D”ÜvïŞıÊøñã£ÿìCã½’€O ÄÊĞ şùÏşà’K.™-9""iLÓ,1bÄŒ&£ÿMRJ2œH¬S§ZıÿíİoLTWÇñg¹°‚PE¤ÊJEWºvŠ—bÿhR²‚­»«	»¦‰/ÌFğÆô…m§µ4»IEÓ¤‘D‹kİÄêÚ6©&hµŠ6é¶`+Kù³¬ÀÒ ¶Ó‘A1¤sïÜ}!c§Ã sïÌ|?o™!9dßyî9ç._¾ü7
+¯4¯.;ıŠ?·ı0@dİ¿ÿäeeeÛY  ;ûñÎÊÊÊ.‘»¦	×ş#5 ‘7¤(JŠ®ë÷µ´´Üioo?[RRòÇ„„„û DÂ™3gv®_¿ş’ï{]×[ŒO¼" @×u—ˆ,! ˆ'Å_Xøg€qÜ"’!B ‹¿¢(ƒº®÷9¦xF 0Çw)@ä§°víÚ',Ë\£ á2ìÑ¼Ÿœ;ûbÀÌŸÖ¿ÁØh0EQ–jš–æÿXSSÓÖG¬nSøõ ˆnN§³¡¼¼üU¿c~}Øòg0: Óuİåß	9pà@£ÇóãùÂÂÂ•			sŒ L…æÕåËË—÷,[¶loKKË€§ÛDÄcÄ¸ğ¦˜&¬`³Ù,§NÚşĞ¢œçè ˆn·»}ïŞ½ß6¿ ÌüM‚ªb"ÁB€ˆˆİnÏ¨¬¬ÜB `fN§³áäÉ“JKK¿ã%m2r‹tjb>÷d·Û3víÚõ'Ö 0“‰
+¿¢(ƒš¦]‹ô¸0>ªˆ9%+Š’¬ r÷ÒÀÁƒ7¬\¹rSbbâ’H 4¯.ÿëî:qèĞ¡Çhõûp{_“" ˜ØX—üÙíöŒ;vüÎjµşùx8RcTUuõôôœ¯­­½0N›_DîÍú{…–¿i ÌoÜn€?_ÈÍÍ-“>·€Ë ¦Cóê¢{µëmmmçëëë¯LTôı0ëTˆèrğq89«W¯^bµZKOOÏŸ•šö0¡ ÀXTUu}ÿı÷]]]ÍÍÍUUUm~wë…?ŠP¢Ï¤ƒ€Íf³”——/ËËËËÍÉÉ)˜7oŞÖ ñiØ£yo»o6ö÷÷7twwsôèÑ«Aë	…?
+ ¢W²ˆÌR%m*aÀ‡P Ä¾0{á,  Ä†°„›ÍfÙ½{÷*«ÕúXvvö3‰‰‰éa#€Ñ¼ºÜtıĞĞÑÑQ[SSse‚Uú!£èÇ@lÊT%MD$À·¸0''§ óÁùÅ¬# ÌÇív·÷ôô\šäb½qüA¹-ı˜Ã'yìKù–¯;ŸŸÿ,a 0–ªª×¯\¹òÁ¾}û>SKpä[
+~àÓ;>%‹È,‘é„ßDœA Dªª®¶¶¶?~aª­}EQED˜İÇ7 üeŠL-p¿`f…pÎ~P{Œ…OjŒgÒÀf³Y;¶yéo)µ$)	3;< öõõõÕîß¿ÿÀdfû~í|¶æaL LFf¨aÀï~¥ì" &gçì‹‹õ05 LUÈa ®®nããO<ù2—€‰õõõÕ¾ğÂo†¸¨ï[¡ècŠøDÆt…tİnÏxûí·w.X° 8‚c¢†ªª×9ò7ÙA¤ NS\]]½bÓ¦M/±k ¸KóêòÕ——÷¬ZµêÃ	^Êq»+ fÂ„A€ËÀÄí~óa&)F 1É£ëºKDÜŠ¢üR×õû_pøğáVçÇó………+æ0FÀ0šW—//_ŞcµZ÷µ´´Œjå+Š2¨ëz§®ë7DdÈ€!"0ıB$ŒÙ°Ùl–S§Nm_¼xñsFˆ4UU¯WTTìgu?­~D ‘”,"Ë‚=qúôé5EÏ¬ÛËÙˆe'JJJö_½zu8ÈÓ~D FÈ‘…ÚíöŒwŞyg?k†=š÷âùs/­_¿şRàs¬ê‡Q 0JĞË6›ÍrîÜ¹¿±]±BUUWEEÅÖ1ZşÌúa Œ´ĞÔÔ´5//o›ãÂÆív·—••m\åÏ¬f@ €]púôé5ë~ÿ‡7Ù*ˆhÔ××W»nİº×ƒ\ïgÖS` ÌÀ#"}Š¢¤øo<~üxçÂ…¿úêQÛŠ‰¤ D‘æææƒK—.İ{ãÆ5à©60bL@  Lcäì MDî­¨©©é÷ª………kî7nt@hêëë÷õld_‹Ü»€) `6C>ÿüóUUÿM€ÙÕ××:Òwäzÿ5£ÆŒ…¶*ÌjÔº »İñŞ{ïı‹ÛÃŒ‚áz?LŒ ÌÊ#G	·´´Üioo?[RR²šãƒa&gÎœÙYTTt&àaŠ?L  3óèºîò_8>%À4¯.g?şxg~XìÓ# Àô0#Í«Ë¹³cö÷ÃôX€¨¡(ÊRÿ“m6›å³Ï>;ÂÑÁˆ4Š?b7^AÔĞ4íš¢(ƒ¾ï¯^½:üôÓOoq»İíFñEóêòîáü•âhG @T+8Î#Ç…øà+ş¥¥¥_<Õ(D ¢N°PTT´£¯¯¯ÖÈq!¶i^]^Ûõê_‚ÿ6CLk ÍFİH¨··w/wD¸{4ïß_mc;ú50 ,è  š}'w÷Zß“••õRggç	ƒÆƒ¤ªª+°øt (şˆjt Fuêêê6>şÄ“/s!L‡Óél(**ÚáG?öE¬àÓ±bT¨®®^±eË–7ãùè`UU]CCCNÇ3èñxDD†‡‡""CCC"")))³-K†ˆHRRÒì¤¤¤´”””Ä_$(Kâ9@577\¾|ù!ÿÇ(şˆ%ñû×X4*ØíöŒªªª7222
+ÓŒöhŞÛî›·nİºÖßßßÕÜÜÜÑÙÙ9äzõ¤ÙíöŒ¢¢¢…yyy¹©©©³çÎ»tŞ¼yù±ª†=š÷è?ßİ¸ØâXC @¬DDššš¶æååm3`<a¥yuÑ½Úõ¯Z[[ÿóÅ_\G¡Ÿ,»İ±yófÛ¢E‹~½fVjÚÃ±Ğ-p»İíeeeÛßÿ}§ÿãÄ¢èÿ‹Fu'A‘{—^MLL\bÀ˜¦LUUWOOÏùÚÚÚUUUmş×£ÍÄápä<ÿüók³³³×DÛéŒšW—ÿ¶¶Œjù‹Pü» ˆUÉŠ¢dùìSWW·ñ·¿hIRL¹FóêrûÖ`{kkëG555WŒ˜áO—¯CŸŸÿlæƒó‹ÍÜèìì<áp8ÎúGpG?Ä,óşUaxÿ ›Íf9vìØæG¬n3CqöhŞ›Îï.566~òÊ+¯Ô…c–ï;,IÓ´Á€§nyù¬ ?Ÿ6òó£Ş¿Éª®®^Q\\¼6;;û³¬p:o½õVå8‹£}ÓŒÿäf^Ğu"wgª•••[,|hS¤;n·»½§§çR}}ı• §Ë…$ Èß–™-XÉ2EI›j0p896lX™››[<'}nA$˜æÕå¦ë‡†“'Oë=§åxA @¼º.ÀŸo–:Sa@óêòİşÚ®®®†}ûö}:FËy\#Å)Å>TÉ"2kªÀf³YvïŞ½Êjµ>6“İ·ÛİŞÚÚúQï;-Ä âÍ˜İ ÕÕÕ+zê©•#ÛŞ–LvO¼ªª®ëıııİİİßLsµş·b‚?‘i‚òòòeyyy¹óçÏÏIOOÏŸìßN‰WGGGm(ak$XõJt¼Ç@X Æ\ 8‡Ã‘³zõê%ééésıw¹\?øşİÛÛëšîJ}Îò§#s:—|GÎâÅ‹g‹ˆdee¥‹ˆø~©©©³»»»¿éííu]¼xñÛ)tV¸Ö¸D @<›R˜	~E?–ÛÏÓêÌ Úıˆk À€ c³ü©0$ÄIĞBB  ~nFÂ@Àj}ŠÏh3(ú@p `l?Ûö&Úx¿‚#¿3üpÈ™ü{?òZŞ @Ø%|…q’…ß                                                Âäÿu$BÔ
+³MH    IEND®B`‚

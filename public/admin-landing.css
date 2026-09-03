@@ -1,0 +1,334 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&display=swap');
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    background-color: #050b17;
+    background-image:
+        radial-gradient(circle at 25% 10%, rgba(0, 240, 255, 0.1) 0%, transparent 20%),
+        radial-gradient(circle at 75% 30%, rgba(144, 0, 255, 0.08) 0%, transparent 25%),
+        radial-gradient(circle at 50% 80%, rgba(255, 0, 200, 0.1) 0%, transparent 20%);
+    background-attachment: fixed;
+    min-height: 100vh;
+    overflow-x: hidden;
+}
+
+.teks-glow {
+    text-shadow: 0 0 10px rgba(0, 240, 255, 0.7);
+}
+
+.teks-neon {
+    background: linear-gradient(90deg, #00f0ff, #9000ff, #ff00c8);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+}
+
+.neon-border {
+    position: relative;
+}
+
+.neon-border::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    padding: 1.5px;
+    border-radius: inherit;
+    background: linear-gradient(90deg, #00f0ff, #9000ff, #ff00c8);
+    -webkit-mask:
+        linear-gradient(#fff 0 0) content-box,
+        linear-gradient(#fff 0 0);
+    mask:
+        linear-gradient(#fff 0 0) content-box,
+        linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
+}
+
+.nav-link {
+    position: relative;
+}
+
+.nav-link::after {
+    content: '';
+    position: absolute;
+    width: 0;
+    height: 2px;
+    bottom: -4px;
+    left: 0;
+    background: linear-gradient(90deg, #00f0ff, #9000ff);
+    transition: width 0.3s ease;
+}
+
+.nav-link:hover::after,
+.nav-link.active::after {
+    width: 100%;
+}
+
+.kartu-transparan {
+    background: rgba(7, 20, 38, 0.7);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(0, 240, 255, 0.1);
+    transition: all 0.4s ease;
+}
+
+.kartu-transparan:hover {
+    transform: translateY(-5px);
+    border: 1px solid rgba(0, 240, 255, 0.3);
+    box-shadow: 0 10px 30px -5px rgba(0, 240, 255, 0.2);
+}
+
+.skill-bar {
+    height: 6px;
+    background: rgba(7, 20, 38, 0.8);
+    border-radius: 3px;
+    overflow: hidden;
+    position: relative;
+}
+
+.skill-progress {
+    height: 100%;
+    border-radius: 3px;
+    background: linear-gradient(90deg, #00f0ff, #9000ff);
+    position: relative;
+    overflow: hidden;
+}
+
+.skill-progress::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(90deg,
+            transparent 0%,
+            rgba(255, 255, 255, 0.2) 50%,
+            transparent 100%);
+    animation: shimmer 2s infinite;
+}
+
+@keyframes shimmer {
+    0% {
+        transform: translateX(-100%);
+    }
+
+    100% {
+        transform: translateX(100%);
+    }
+}
+
+.timeline-item {
+    position: relative;
+    padding-left: 28px;
+}
+
+.timeline-item::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    height: 100%;
+    width: 2px;
+    background: linear-gradient(to bottom, #00f0ff, #9000ff);
+}
+
+.timeline-dot {
+    position: absolute;
+    left: -5px;
+    top: 6px;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #00f0ff;
+    box-shadow: 0 0 10px rgba(0, 240, 255, 0.7);
+}
+
+.project-card {
+    position: relative;
+    overflow: hidden;
+}
+
+.project-overlay {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: linear-gradient(to top, rgba(5, 11, 23, 0.95), transparent);
+    padding: 1.5rem;
+    transform: translateY(100%);
+    transition: transform 0.4s cubic-bezier(0.17, 0.67, 0.83, 0.67);
+}
+
+.project-card:hover .project-overlay {
+    transform: translateY(0);
+}
+
+.section {
+    opacity: 0;
+    transform: translateY(30px);
+    transition: opacity 0.8s ease, transform 0.8s ease;
+}
+
+.section.visible {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.floating {
+    animation: floating 3s ease-in-out infinite;
+}
+
+@keyframes floating {
+    0% {
+        transform: translateY(0px);
+    }
+
+    50% {
+        transform: translateY(-15px);
+    }
+
+    100% {
+        transform: translateY(0px);
+    }
+}
+
+.rotating-border {
+    position: relative;
+    z-index: 0;
+    overflow: hidden;
+    border-radius: 50%;
+}
+
+.rotating-border::before {
+    content: '';
+    position: absolute;
+    z-index: -2;
+    left: -50%;
+    top: -50%;
+    width: 200%;
+    height: 200%;
+    background-color: transparent;
+    background-repeat: no-repeat;
+    background-size: 50% 50%, 50% 50%;
+    background-position: 0 0, 100% 0, 100% 100%, 0 100%;
+    background-image: linear-gradient(#00f0ff, #00f0ff),
+        linear-gradient(#9000ff, #9000ff),
+        linear-gradient(#ff00c8, #ff00c8),
+        linear-gradient(#00f0ff, #00f0ff);
+    animation: rotate 4s linear infinite;
+    border-radius: 50%;
+}
+
+.rotating-border::after {
+    content: '';
+    position: absolute;
+    z-index: -1;
+    left: 6px;
+    top: 6px;
+    width: calc(100% - 12px);
+    height: calc(100% - 12px);
+    background: #071426;
+    border-radius: inherit;
+}
+
+@keyframes rotate {
+    100% {
+        transform: rotate(1turn);
+    }
+}
+
+.glow {
+    box-shadow: 0 0 15px rgba(0, 240, 255, 0.5);
+}
+
+.tombol-neon {
+    position: relative;
+    overflow: hidden;
+    transition: all 0.3s ease;
+}
+
+.tombol-neon::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg,
+            transparent,
+            rgba(255, 255, 255, 0.2),
+            transparent);
+    transition: all 0.6s ease;
+}
+
+.tombol-neon:hover::before {
+    left: 100%;
+}
+
+.grid-bg {
+    background-image:
+        linear-gradient(rgba(0, 240, 255, 0.05) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0, 240, 255, 0.05) 1px, transparent 1px);
+    background-size: 20px 20px;
+}
+
+.hexagon {
+    clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%);
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+    width: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: rgba(7, 20, 38, 0.5);
+}
+
+::-webkit-scrollbar-thumb {
+    background: linear-gradient(#00f0ff, #9000ff);
+    border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(#9000ff, #ff00c8);
+}
+
+.cursor {
+    position: fixed;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: rgba(0, 240, 255, 0.5);
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    mix-blend-mode: screen;
+    z-index: 9999;
+    transition: transform 0.2s ease;
+}
+
+.cursor-follower {
+    position: fixed;
+    width: 40px;
+    height: 40px;
+    border: 2px solid rgba(144, 0, 255, 0.3);
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    z-index: 9998;
+    transition: transform 0.3s ease, width 0.3s ease, height 0.3s ease;
+}
+
+.expand {
+    transform: translate(-50%, -50%) scale(1.5);
+    background: rgba(0, 240, 255, 0.2);
+}
+
+.expand-follower {
+    transform: translate(-50%, -50%) scale(0.5);
+    border-color: rgba(255, 0, 200, 0.5);
+}

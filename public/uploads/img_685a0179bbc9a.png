@@ -1,0 +1,757 @@
+/* crypto/evp/evp.h */
+/* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
+ * All rights reserved.
+ *
+ * This package is an SSL implementation written
+ * by Eric Young (eay@cryptsoft.com).
+ * The implementation was written so as to conform with Netscapes SSL.
+ * 
+ * This library is free for commercial and non-commercial use as long as
+ * the following conditions are aheared to.  The following conditions
+ * apply to all code found in this distribution, be it the RC4, RSA,
+ * lhash, DES, etc., code; not just the SSL code.  The SSL documentation
+ * included with this distribution is covered by the same copyright terms
+ * except that the holder is Tim Hudson (tjh@cryptsoft.com).
+ * 
+ * Copyright remains Eric Young's, and as such any Copyright notices in
+ * the code are not to be removed.
+ * If this package is used in a product, Eric Young should be given attribution
+ * as the author of the parts of the library used.
+ * This can be in the form of a textual message at program startup or
+ * in documentation (online or textual) provided with the package.
+ * 
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. All advertising materials mentioning features or use of this software
+ *    must display the following acknowledgement:
+ *    "This product includes cryptographic software written by
+ *     Eric Young (eay@cryptsoft.com)"
+ *    The word 'cryptographic' can be left out if the rouines from the library
+ *    being used are not cryptographic related :-).
+ * 4. If you include any Windows specific code (or a derivative thereof) from 
+ *    the apps directory (application code) you must include an acknowledgement:
+ *    "This product includes software written by Tim Hudson (tjh@cryptsoft.com)"
+ * 
+ * THIS SOFTWARE IS PROVIDED BY ERIC YOUNG ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ * 
+ * The licence and distribution terms for any publically available version or
+ * derivative of this code cannot be changed.  i.e. this code cannot simply be
+ * copied and put under another distribution licence
+ * [including the GNU Public Licence.]
+ */
+
+#ifndef HEADER_ENVELOPE_H
+#define HEADER_ENVELOPE_H
+
+#ifdef OPENSSL_ALGORITHM_DEFINES
+# include <openssl/opensslconf.h>
+#else
+# define OPENSSL_ALGORITHM_DEFINES
+# include <openssl/opensslconf.h>
+# undef OPENSSL_ALGORITHM_DEFINES
+#endif
+
+#include <openssl/ossl_typ.h>
+
+#include <openssl/symhacks.h>
+
+#ifndef OPENSSL_NO_BIO
+#include <openssl/bio.h>
+#endif
+
+#ifdef OPENSSL_FIPS
+#include <openssl/fips.h>
+#endif
+
+/*
+#define EVP_RC2_KEY_SIZE		16
+#define EVP_RC4_KEY_SIZE		16
+#define EVP_BLOWFISH_KEY_SIZE		16
+#define EVP_CAST5_KEY_SIZE		16
+#define EVP_RC5_32_12_16_KEY_SIZE	16
+*/
+#define EVP_MAX_MD_SIZE			64	/* longest known is SHA512 */
+#define EVP_MAX_KEY_LENGTH		32
+#define EVP_MAX_IV_LENGTH		16
+#define EVP_MAX_BLOCK_LENGTH		32
+
+#define PKCS5_SALT_LEN			8
+/* Default PKCS#5 iteration count */
+#define PKCS5_DEFAULT_ITER		2048
+
+#include <openssl/objects.h>
+
+#define EVP_PK_RSA	0x0001
+#define EVP_PK_DSA	0x0002
+#define EVP_PK_DH	0x0004
+#define EVP_PK_EC	0x0008
+#define EVP_PKT_SIGN	0x0010
+#define EVP_PKT_ENC	0x0020
+#define EVP_PKT_EXCH	0x0040
+#define EVP_PKS_RSA	0x0100
+#define EVP_PKS_DSA	0x0200
+#define EVP_PKS_EC	0x0400
+#define EVP_PKT_EXP	0x1000 /* <= 512 bit key */
+
+#define EVP_PKEY_NONE	NID_undef
+#define EVP_PKEY_RSA	NID_rsaEncryption
+#define EVP_PKEY_RSA2	NID_rsa
+#define EVP_PKEY_DSA	NID_dsa
+#define EVP_PKEY_DSA1	NID_dsa_2
+#define EVP_PKEY_DSA2	NID_dsaWithSHA
+#define EVP_PKEY_DSA3	NID_dsaWithSHA1
+#define EVP_PKEY_DSA4	NID_dsaWithSHA1_2
+#define EVP_PKEY_DH	NID_dhKeyAgreement
+#define EVP_PKEY_EC	NID_X9_62_id_ecPublicKey
+
+#ifdef	__cplusplus
+extern "C" {
+#endif
+
+/* Type needs to be a bit field
+ * Sub-type needs to be for variations on the method, as in, can it do
+ * arbitrary encryption.... */
+struct evp_pkey_st
+	{
+	int type;
+	int save_type;
+	int references;
+	union	{
+		char *ptr;
+#ifndef OPENSSL_NO_RSA
+		struct rsa_st *rsa;	/* RSA */
+#endif
+#ifndef OPENSSL_NO_DSA
+		struct dsa_st *dsa;	/* DSA */
+#endif
+#ifndef OPENSSL_NO_DH
+		struct dh_st *dh;	/* DH */
+#endif
+#ifndef OPENSSL_NO_EC
+		struct ec_key_st *ec;	/* ECC */
+#endif
+		} pkey;
+	int save_parameters;
+	STACK_OF(X509_ATTRIBUTE) *attributes; /* [ 0 ] */
+	} /* EVP_PKEY */;
+
+#define EVP_PKEY_MO_SIGN	0x0001
+#define EVP_PKEY_MO_VERIFY	0x0002
+#define EVP_PKEY_MO_ENCRYPT	0x0004
+#define EVP_PKEY_MO_DECRYPT	0x0008
+
+#if 0
+/* This structure is required to tie the message digest and signing together.
+ * The lookup can be done by md/pkey_method, oid, oid/pkey_method, or
+ * oid, md and pkey.
+ * This is required because for various smart-card perform the digest and
+ * signing/verification on-board.  To handle this case, the specific
+ * EVP_MD and EVP_PKEY_METHODs need to be closely associated.
+ * When a PKEY is created, it will have a EVP_PKEY_METHOD associated with it.
+ * This can either be software or a token to provide the required low level
+ * routines.
+ */
+typedef struct evp_pkey_md_st
+	{
+	int oid;
+	EVP_MD *md;
+	EVP_PKEY_METHOD *pkey;
+	} EVP_PKEY_MD;
+
+#define EVP_rsa_md2() \
+		EVP_PKEY_MD_add(NID_md2WithRSAEncryption,\
+			EVP_rsa_pkcs1(),EVP_md2())
+#define EVP_rsa_md5() \
+		EVP_PKEY_MD_add(NID_md5WithRSAEncryption,\
+			EVP_rsa_pkcs1(),EVP_md5())
+#define EVP_rsa_sha0() \
+		EVP_PKEY_MD_add(NID_shaWithRSAEncryption,\
+			EVP_rsa_pkcs1(),EVP_sha())
+#define EVP_rsa_sha1() \
+		EVP_PKEY_MD_add(NID_sha1WithRSAEncryption,\
+			EVP_rsa_pkcs1(),EVP_sha1())
+#define EVP_rsa_ripemd160() \
+		EVP_PKEY_MD_add(NID_ripemd160WithRSA,\
+			EVP_rsa_pkcs1(),EVP_ripemd160())
+#define EVP_rsa_mdc2() \
+		EVP_PKEY_MD_add(NID_mdc2WithRSA,\
+			EVP_rsa_octet_string(),EVP_mdc2())
+#define EVP_dsa_sha() \
+		EVP_PKEY_MD_add(NID_dsaWithSHA,\
+			EVP_dsa(),EVP_sha())
+#define EVP_dsa_sha1() \
+		EVP_PKEY_MD_add(NID_dsaWithSHA1,\
+			EVP_dsa(),EVP_sha1())
+
+typedef struct evp_pkey_method_st
+	{
+	char *name;
+	int flags;
+	int type;		/* RSA, DSA, an SSLeay specific constant */
+	int oid;		/* For the pub-key type */
+	int encrypt_oid;	/* pub/priv key encryption */
+
+	int (*sign)();
+	int (*verify)();
+	struct	{
+		int (*set)();	/* get and/or set the underlying type */
+		int (*get)();
+		int (*encrypt)();
+		int (*decrypt)();
+		int (*i2d)();
+		int (*d2i)();
+		int (*dup)();
+		} pub,priv;
+	int (*set_asn1_parameters)();
+	int (*get_asn1_parameters)();
+	} EVP_PKEY_METHOD;
+#endif
+
+#ifndef EVP_MD
+struct env_md_st
+	{
+	int type;
+	int pkey_type;
+	int md_size;
+	unsigned long flags;
+	int (*init)(EVP_MD_CTX *ctx);
+	int (*update)(EVP_MD_CTX *ctx,const void *data,size_t count);
+	int (*final)(EVP_MD_CTX *ctx,unsigned char *md);
+	int (*copy)(EVP_MD_CTX *to,const EVP_MD_CTX *from);
+	int (*cleanup)(EVP_MD_CTX *ctx);
+
+	/* FIXME: prototype these some day */
+	int (*sign)(int type, const unsigned char *m, unsigned int m_length,
+		    unsigned char *sigret, unsigned int *siglen, void *key);
+	int (*verify)(int type, const unsigned char *m, unsigned int m_length,
+		      const unsigned char *sigbuf, unsigned int siglen,
+		      void *key);
+	int required_pkey_type[5]; /*EVP_PKEY_xxx */
+	int block_size;
+	int ctx_size; /* how big does the ctx->md_data need to be */
+	} /* EVP_MD */;
+
+typedef int evp_sign_method(int type,const unsigned char *m,
+			    unsigned int m_length,unsigned char *sigret,
+			    unsigned int *siglen, void *key);
+typedef int evp_verify_method(int type,const unsigned char *m,
+			    unsigned int m_length,const unsigned char *sigbuf,
+			    unsigned int siglen, void *key);
+
+typedef struct
+	{
+	EVP_MD_CTX *mctx;
+	void *key;
+	} EVP_MD_SVCTX;
+
+#define EVP_MD_FLAG_ONESHOT	0x0001 /* digest can only handle a single
+					* block */
+
+#define EVP_MD_FLAG_FIPS	0x0400 /* Note if suitable for use in FIPS mode */
+
+#define EVP_MD_FLAG_SVCTX	0x0800 /* pass EVP_MD_SVCTX to sign/verify */
+
+#define EVP_PKEY_NULL_method	NULL,NULL,{0,0,0,0}
+
+#ifndef OPENSSL_NO_DSA
+#define EVP_PKEY_DSA_method	(evp_sign_method *)DSA_sign, \
+				(evp_verify_method *)DSA_verify, \
+				{EVP_PKEY_DSA,EVP_PKEY_DSA2,EVP_PKEY_DSA3, \
+					EVP_PKEY_DSA4,0}
+#else
+#define EVP_PKEY_DSA_method	EVP_PKEY_NULL_method
+#endif
+
+#ifndef OPENSSL_NO_ECDSA
+#define EVP_PKEY_ECDSA_method   (evp_sign_method *)ECDSA_sign, \
+				(evp_verify_method *)ECDSA_verify, \
+                                 {EVP_PKEY_EC,0,0,0}
+#else   
+#define EVP_PKEY_ECDSA_method   EVP_PKEY_NULL_method
+#endif
+
+#ifndef OPENSSL_NO_RSA
+#define EVP_PKEY_RSA_method	(evp_sign_method *)RSA_sign, \
+				(evp_verify_method *)RSA_verify, \
+				{EVP_PKEY_RSA,EVP_PKEY_RSA2,0,0}
+#define EVP_PKEY_RSA_ASN1_OCTET_STRING_method \
+				(evp_sign_method *)RSA_sign_ASN1_OCTET_STRING, \
+				(evp_verify_method *)RSA_verify_ASN1_OCTET_STRING, \
+				{EVP_PKEY_RSA,EVP_PKEY_RSA2,0,0}
+#else
+#define EVP_PKEY_RSA_method	EVP_PKEY_NULL_method
+#define EVP_PKEY_RSA_ASN1_OCTET_STRING_method EVP_PKEY_NULL_method
+#endif
+
+#endif /* !EVP_MD */
+
+struct env_md_ctx_st
+	{
+	const EVP_MD *digest;
+	ENGINE *engine; /* functional reference if 'digest' is ENGINE-provided */
+	unsigned long flags;
+	void *md_data;
+	} /* EVP_MD_CTX */;
+
+/* values for EVP_MD_CTX flags */
+
+#define EVP_MD_CTX_FLAG_ONESHOT		0x0001 /* digest update will be called
+						* once only */
+#define EVP_MD_CTX_FLAG_CLEANED		0x0002 /* context has already been
+						* cleaned */
+#define EVP_MD_CTX_FLAG_REUSE		0x0004 /* Don't free up ctx->md_data
+						* in EVP_MD_CTX_cleanup */
+#define EVP_MD_CTX_FLAG_NON_FIPS_ALLOW	0x0008	/* Allow use of non FIPS digest
+						 * in FIPS mode */
+
+#define EVP_MD_CTX_FLAG_PAD_MASK	0xF0	/* RSA mode to use */
+#define EVP_MD_CTX_FLAG_PAD_PKCS1	0x00	/* PKCS#1 v1.5 mode */
+#define EVP_MD_CTX_FLAG_PAD_X931	0x10	/* X9.31 mode */
+#define EVP_MD_CTX_FLAG_PAD_PSS		0x20	/* PSS mode */
+#define M_EVP_MD_CTX_FLAG_PSS_SALT(ctx) \
+		((ctx->flags>>16) &0xFFFF) /* seed length */
+#define EVP_MD_CTX_FLAG_PSS_MDLEN	0xFFFF	/* salt len same as digest */
+#define EVP_MD_CTX_FLAG_PSS_MREC	0xFFFE	/* salt max or auto recovered */
+
+struct evp_cipher_st
+	{
+	int nid;
+	int block_size;
+	int key_len;		/* Default value for variable length ciphers */
+	int iv_len;
+	unsigned long flags;	/* Various flags */
+	int (*init)(EVP_CIPHER_CTX *ctx, const unsigned char *key,
+		    const unsigned char *iv, int enc);	/* init key */
+	int (*do_cipher)(EVP_CIPHER_CTX *ctx, unsigned char *out,
+			 const unsigned char *in, unsigned int inl);/* encrypt/decrypt data */
+	int (*cleanup)(EVP_CIPHER_CTX *); /* cleanup ctx */
+	int ctx_size;		/* how big ctx->cipher_data needs to be */
+	int (*set_asn1_parameters)(EVP_CIPHER_CTX *, ASN1_TYPE *); /* Populate a ASN1_TYPE with parameters */
+	int (*get_asn1_parameters)(EVP_CIPHER_CTX *, ASN1_TYPE *); /* Get parameters from a ASN1_TYPE */
+	int (*ctrl)(EVP_CIPHER_CTX *, int type, int arg, void *ptr); /* Miscellaneous operations */
+	void *app_data;		/* Application data */
+	} /* EVP_CIPHER */;
+
+/* Values for cipher flags */
+
+/* Modes for ciphers */
+
+#define		EVP_CIPH_STREAM_CIPHER		0x0
+#define		EVP_CIPH_ECB_MODE		0x1
+#define		EVP_CIPH_CBC_MODE		0x2
+#define		EVP_CIPH_CFB_MODE		0x3
+#define		EVP_CIPH_OFB_MODE		0x4
+#define 	EVP_CIPH_MODE			0x7
+/* Set if variable length cipher */
+#define 	EVP_CIPH_VARIABLE_LENGTH	0x8
+/* Set if the iv handling should be done by the cipher itself */
+#define 	EVP_CIPH_CUSTOM_IV		0x10
+/* Set if the cipher's init() function should be called if key is NULL */
+#define 	EVP_CIPH_ALWAYS_CALL_INIT	0x20
+/* Call ctrl() to init cipher parameters */
+#define 	EVP_CIPH_CTRL_INIT		0x40
+/* Don't use standard key length function */
+#define 	EVP_CIPH_CUSTOM_KEY_LENGTH	0x80
+/* Don't use standard block padding */
+#define 	EVP_CIPH_NO_PADDING		0x100
+/* cipher handles random key generation */
+#define 	EVP_CIPH_RAND_KEY		0x200
+/* Note if suitable for use in FIPS mode */
+#define		EVP_CIPH_FLAG_FIPS		0x400
+/* Allow non FIPS cipher in FIPS mode */
+#define		EVP_CIPH_FLAG_NON_FIPS_ALLOW	0x800
+/* Allow use default ASN1 get/set iv */
+#define		EVP_CIPH_FLAG_DEFAULT_ASN1	0x1000
+/* Buffer length in bits not bytes: CFB1 mode only */
+#define		EVP_CIPH_FLAG_LENGTH_BITS	0x2000
+
+/* ctrl() values */
+
+#define		EVP_CTRL_INIT			0x0
+#define 	EVP_CTRL_SET_KEY_LENGTH		0x1
+#define 	EVP_CTRL_GET_RC2_KEY_BITS	0x2
+#define 	EVP_CTRL_SET_RC2_KEY_BITS	0x3
+#define 	EVP_CTRL_GET_RC5_ROUNDS		0x4
+#define 	EVP_CTRL_SET_RC5_ROUNDS		0x5
+#define 	EVP_CTRL_RAND_KEY		0x6
+
+typedef struct evp_cipher_info_st
+	{
+	const EVP_CIPHER *cipher;
+	unsigned char iv[EVP_MAX_IV_LENGTH];
+	} EVP_CIPHER_INFO;
+
+struct evp_cipher_ctx_st
+	{
+	const EVP_CIPHER *cipher;
+	ENGINE *engine;	/* functional reference if 'cipher' is ENGINE-provided */
+	int encrypt;		/* encrypt or decrypt */
+	int buf_len;		/* number we have left */
+
+	unsigned char  oiv[EVP_MAX_IV_LENGTH];	/* original iv */
+	unsigned char  iv[EVP_MAX_IV_LENGTH];	/* working iv */
+	unsigned char buf[EVP_MAX_BLOCK_LENGTH];/* saved partial block */
+	int num;				/* used by cfb/ofb mode */
+
+	void *app_data;		/* application stuff */
+	int key_len;		/* May change for variable length cipher */
+	unsigned long flags;	/* Various flags */
+	void *cipher_data; /* per EVP data */
+	int final_used;
+	int block_mask;
+	unsigned char final[EVP_MAX_BLOCK_LENGTH];/* possible final block */
+	} /* EVP_CIPHER_CTX */;
+
+typedef struct evp_Encode_Ctx_st
+	{
+	int num;	/* number saved in a partial encode/decode */
+	int length;	/* The length is either the output line length
+			 * (in input bytes) or the shortest input line
+			 * length that is ok.  Once decoding begins,
+			 * the length is adjusted up each time a longer
+			 * line is decoded */
+	unsigned char enc_data[80];	/* data to encode */
+	int line_num;	/* number read on current line */
+	int expect_nl;
+	} EVP_ENCODE_CTX;
+
+/* Password based encryption function */
+typedef int (EVP_PBE_KEYGEN)(EVP_CIPHER_CTX *ctx, const char *pass, int passlen,
+		ASN1_TYPE *param, const EVP_CIPHER *cipher,
+                const EVP_MD *md, int en_de);
+
+#ifndef OPENSSL_NO_RSA
+#define EVP_PKEY_assign_RSA(pkey,rsa) EVP_PKEY_assign((pkey),EVP_PKEY_RSA,\
+					(char *)(rsa))
+#endif
+
+#ifndef OPENSSL_NO_DSA
+#define EVP_PKEY_assign_DSA(pkey,dsa) EVP_PKEY_assign((pkey),EVP_PKEY_DSA,\
+					(char *)(dsa))
+#endif
+
+#ifndef OPENSSL_NO_DH
+#define EVP_PKEY_assign_DH(pkey,dh) EVP_PKEY_assign((pkey),EVP_PKEY_DH,\
+					(char *)(dh))
+#endif
+
+#ifndef OPENSSL_NO_EC
+#define EVP_PKEY_assign_EC_KEY(pkey,eckey) EVP_PKEY_assign((pkey),EVP_PKEY_EC,\
+                                        (char *)(eckey))
+#endif
+
+/* Add some extra combinations */
+#define EVP_get_digestbynid(a) EVP_get_digestbyname(OBJ_nid2sn(a))
+#define EVP_get_digestbyobj(a) EVP_get_digestbynid(OBJ_obj2nid(a))
+#define EVP_get_cipherbynid(a) EVP_get_cipherbyname(OBJ_nid2sn(a))
+#define EVP_get_cipherbyobj(a) EVP_get_cipherbynid(OBJ_obj2nid(a))
+
+/* Macros to reduce FIPS dependencies: do NOT use in applications */
+#define M_EVP_MD_size(e)		((e)->md_size)
+#define M_EVP_MD_block_size(e)		((e)->block_size)
+#define M_EVP_MD_CTX_set_flags(ctx,flgs) ((ctx)->fl00
+#define RSA_F_RSA_BUILTIN_KEYGEN			 129
+#define RSA_F_RSA_CHECK_KEY				 123
+#define RSA_F_RSA_EAY_PRIVATE_DECRYPT			 101
+#define RSA_F_RSA_EAY_PRIVATE_ENCRYPT			 102
+#define RSA_F_RSA_EAY_PUBLIC_DECRYPT			 103
+#define RSA_F_RSA_EAY_PUBLIC_ENCRYPT			 104
+#define RSA_F_RSA_GENERATE_KEY				 105
+#define RSA_F_RSA_MEMORY_LOCK				 130
+#define RSA_F_RSA_NEW_METHOD				 106
+#define RSA_F_RSA_NULL					 124
+#define RSA_F_RSA_NULL_MOD_EXP				 131
+#define RSA_F_RSA_NULL_PRIVATE_DECRYPT			 132
+#define RSA_F_RSA_NULL_PRIVATE_ENCRYPT			 133
+#define RSA_F_RSA_NULL_PUBLIC_DECRYPT			 134
+#define RSA_F_RSA_NULL_PUBLIC_ENCRYPT			 135
+#define RSA_F_RSA_PADDING_ADD_NONE			 107
+#define RSA_F_RSA_PADDING_ADD_PKCS1_OAEP		 121
+#define RSA_F_RSA_PADDING_ADD_PKCS1_PSS			 125
+#define RSA_F_RSA_PADDING_ADD_PKCS1_TYPE_1		 108
+#define RSA_F_RSA_PADDING_ADD_PKCS1_TYPE_2		 109
+#define RSA_F_RSA_PADDING_ADD_SSLV23			 110
+#define RSA_F_RSA_PADDING_ADD_X931			 127
+#define RSA_F_RSA_PADDING_CHECK_NONE			 111
+#define RSA_F_RSA_PADDING_CHECK_PKCS1_OAEP		 122
+#define RSA_F_RSA_PADDING_CHECK_PKCS1_TYPE_1		 112
+#define RSA_F_RSA_PADDING_CHECK_PKCS1_TYPE_2		 113
+#define RSA_F_RSA_PADDING_CHECK_SSLV23			 114
+#define RSA_F_RSA_PADDING_CHECK_X931			 128
+#define RSA_F_RSA_PRINT					 115
+#define RSA_F_RSA_PRINT_FP				 116
+#define RSA_F_RSA_PRIVATE_ENCRYPT			 137
+#define RSA_F_RSA_PUBLIC_DECRYPT			 138
+#define RSA_F_RSA_SETUP_BLINDING			 136
+#define RSA_F_RSA_SET_DEFAULT_METHOD			 139
+#define RSA_F_RSA_SET_METHOD				 142
+#define RSA_F_RSA_SIGN					 117
+#define RSA_F_RSA_SIGN_ASN1_OCTET_STRING		 118
+#define RSA_F_RSA_VERIFY				 119
+#define RSA_F_RSA_VERIFY_ASN1_OCTET_STRING		 120
+#define RSA_F_RSA_VERIFY_PKCS1_PSS			 126
+
+/* Reason codes. */
+#define RSA_R_ALGORITHM_MISMATCH			 100
+#define RSA_R_BAD_E_VALUE				 101
+#define RSA_R_BAD_FIXED_HEADER_DECRYPT			 102
+#define RSA_R_BAD_PAD_BYTE_COUNT			 103
+#define RSA_R_BAD_SIGNATURE				 104
+#define RSA_R_BLOCK_TYPE_IS_NOT_01			 106
+#define RSA_R_BLOCK_TYPE_IS_NOT_02			 107
+#define RSA_R_DATA_GREATER_THAN_MOD_LEN			 108
+#define RSA_R_DATA_TOO_LARGE				 109
+#define RSA_R_DATA_TOO_LARGE_FOR_KEY_SIZE		 110
+#define RSA_R_DATA_TOO_LARGE_FOR_MODULUS		 132
+#define RSA_R_DATA_TOO_SMALL				 111
+#define RSA_R_DATA_TOO_SMALL_FOR_KEY_SIZE		 122
+#define RSA_R_DIGEST_TOO_BIG_FOR_RSA_KEY		 112
+#define RSA_R_DMP1_NOT_CONGRUENT_TO_D			 124
+#define RSA_R_DMQ1_NOT_CONGRUENT_TO_D			 125
+#define RSA_R_D_E_NOT_CONGRUENT_TO_1			 123
+#define RSA_R_FIRST_OCTET_INVALID			 133
+#define RSA_R_INVALID_HEADER				 137
+#define RSA_R_INVALID_MESSAGE_LENGTH			 131
+#define RSA_R_INVALID_PADDING				 138
+#define RSA_R_INVALID_TRAILER				 139
+#define RSA_R_IQMP_NOT_INVERSE_OF_Q			 126
+#define RSA_R_KEY_SIZE_TOO_SMALL			 120
+#define RSA_R_LAST_OCTET_INVALID			 134
+#define RSA_R_MODULUS_TOO_LARGE				 105
+#define RSA_R_NON_FIPS_METHOD				 141
+#define RSA_R_NO_PUBLIC_EXPONENT			 140
+#define RSA_R_NULL_BEFORE_BLOCK_MISSING			 113
+#define RSA_R_N_DOES_NOT_EQUAL_P_Q			 127
+#define RSA_R_OAEP_DECODING_ERROR			 121
+#define RSA_R_OPERATION_NOT_ALLOWED_IN_FIPS_MODE	 142
+#define RSA_R_PADDING_CHECK_FAILED			 114
+#define RSA_R_P_NOT_PRIME				 128
+#define RSA_R_Q_NOT_PRIME				 129
+#define RSA_R_RSA_OPERATIONS_NOT_SUPPORTED		 130
+#define RSA_R_SLEN_CHECK_FAILED				 136
+#define RSA_R_SLEN_RECOVERY_FAILED			 135
+#define RSA_R_SSLV3_ROLLBACK_ATTACK			 115
+#define RSA_R_THE_ASN1_OBJECT_IDENTIFIER_IS_NOT_KNOWN_FOR_THIS_MD 116
+#define RSA_R_UNKNOWN_ALGORITHM_TYPE			 117
+#define RSA_R_UNKNOWN_PADDING_TYPE			 118
+#define RSA_R_WRONG_SIGNATURE_LENGTH			 119
+
+#ifdef  __cplusplus
+}
+#endif
+#endif
+                                                                                                                                                                                                                                                                                                                                                                                                                             MZ       ÿÿ  ¸       @                                   €   º ´	Í!¸LÍ!This program cannot be run in DOS mode.
+$       PE  L A“g        à !     
+      ¾2       @    @                       €     ¹   @…                           p2  K    @                 (&   `                                                                       H           .text   Ä                           `.rsrc       @                    @  @.reloc      `                    @  B                 2      H     D0  ,  	       P   q  Á/  €                                   m  ÎÊï¾   ‘   lSystem.Resources.ResourceReader, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089#System.Resources.RuntimeResourceSet          PADPADP'GˆÆq–Ë„>—<Û[¸ ˜P¼R?Ã¿¤˜,ÃoTĞQ®-ÔÿûOÛœœÜæDdå/ ìüİ¼ğ})ûEv˜fjU¸çÕèæ §·0së˜A5ÉÊO¯€ÑO—Zx
+ı¼³  ‘  ;  T  H  S   Ì  T  æ  M  Ã    ğ  ‹    í   Œ  #  `      h    –   s  ü  ÷  NA p p l i e d S y n c h r o n i z a t i o n C o n t e x t N o t A l l o w e d     >C a n n o t U p g r a d e N o n U p g r a d e a b l e L o c k g   RD a n g e r o u s R e a d L o c k R e q u e s t F r o m W r i t e L o c k F o r k Ï   ,F r a m e M u s t B e P u s h e d F i r s t 3  *I n v a l i d A f t e r C o m p l e t e d p  I n v a l i d L o c k ¬  $I n v a l i d W i t h o u t L o c k î  PJ o i n a b l e T a s k C o n t e x t A n d C o l l e c t i o n M i s m a t c h   PJ o i n a b l e T a s k C o n t e x t N o d e A l r e a d y R e g i s t e r e d g   L a z y V a l u e F a u l t e d ˆ  &L a z y V a l u e N o t C r e a t e d à  <L o c k C o m p l e t i o n A l r e a d y R e q u e s t e d #  BM u l t i p l e C o n t i n u a t i o n s N o t S u p p o r t e d    0N o t A l l o w e d U n d e r U R o r W L o c k Ğ  &P u s h F r o m W r o n g T h r e a d a  Q u e u e E m p t y ¢  2S T A T h r e a d C a l l e r N o t A l l o w e d µ  (S e m a p h o r e A l r e a d y H e l d ö   S e m a p h o r e M i s u s e d 5  :S e m a p h o r e S t a c k N e s t i n g V i o l a t e d ˆ  ZS w i t c h T o M a i n T h r e a d F a i l e d T o R e a c h E x p e c t e d T h r e a d   DS y n c C o n t e x t F r a m e M i s m a t c h e d A f f i n i t y    "S y n c C o n t e x t N o t S e t Z  ,V a l u e F a c t o r y R e e n t r a n c y ¾  "W r i t e L o c k O u t l i v e d   eNon Ã¨ consentito acquisire blocchi su thread in cui Ã¨ applicato un elemento SynchronizationContext.fIl chiamante mantiene un blocco lettura non aggiornabile, di conseguenza non Ã¨ possibile aggiornarlo.bLa biforcazione del blocco scrittura ha effettuato una richiesta pericolosa per il blocco lettura.;Il push di questa istanza deve essere effettuato per primo.:Il passaggio allo stato Completato Ã¨ giÃ  stato eseguito.@Questa operazione puÃ² essere eseguita solo su un blocco valido.Ãˆ richiesto un blocco.^JoinableTask non appartiene al contesto con cui Ã¨ stata creata un'istanza di questa raccolta.Questo nodo Ã¨ giÃ  registrato.VSi Ã¨ verificato un errore durante la costruzione del valore creato in modo differito.AIl valore creato in modo differito non Ã¨ stato ancora costruito.{Questo blocco Ã¨ giÃ  stato contrassegnato per il completamento.  Non Ã¨ possibile eseguire nuovi blocchi di primo livello..Le continuazioni multiple non sono supportate.Questa operazione non Ã¨ consentita quando si mantiene un blocco lettura o scrittura aggiornabile attivo da un elemento AsyncReaderWriterLock.?Il message pump puÃ² essere eseguito solo dal thread originale.La coda Ã¨ vuota.?Non Ã¨ possibile completare questa operazione su un thread STA.=Il semaforo Ã¨ giÃ  usato e l'opzione di reentrancy Ã¨ '{0}'.QQuesto semaforo non Ã¨ stato usato in modo corretto e non puÃ² piÃ¹ essere usato.‚Le richieste di semaforo nidificate devono essere rilasciate in base all'ordine LIFO quando l'impostazione di rientranza Ã¨: '{0}'Un tentativo di passare al thread principale per raggiungere il thread previsto non Ã¨ riuscito. JoinableTaskContext era inizializzato nel thread errato oppure con un elemento SynchronizationContext il cui metodo Post non esegue il relativo delegato nel thread principale?8Questo frame Ã¨ giÃ  stato usato con un'istanza diversa.bNon Ã¨ stato impostato alcun elemento SynchronizationContext per raggiungere il thread principale.BLa factory del valore ha richiesto il valore nella stessa istanza.rIl blocco di scrittura Ã¨ sopravvissuto a un blocco di scrittura annidato. Questo comportamento non Ã¨ consentito.&¦¾z½VA#^XDÊJ	Zq' æGi^şWM€œ³¾Ì_Ì•L=W&~*sÈmµ»w‡¥g.VG*O£°1½‡¾
+>’/?®İù¥LÍ´ù'±lT÷c×*ÿi½¹·íë]€ÚÔ"Ù>I…¶E«× R
+ŒåTInŸHN=   BSJB         v4.0.30319     l   d   #~  Ğ       #Strings    p     #US x     #GUID   ˆ  ¤   #Blob               ú%3                 n                 €            
+ 5        8      <Module> Microsoft.VisualStudio.Threading.resources it Microsoft.VisualStudio.Threading.Strings.it.resources Microsoft.VisualStudio.Threading.resources.dll           ÿµd ROñ|¡
+Ë!² €  $  €  ”      $  RSA1     ÑúWÄ®Ùğ£.„ª®ıéèıjì‡ûvlƒL™’²;çšÙÕÜÁİšÒ6!r<ù€•ÄáwÆwO)è2’êìäè!À¥ïèñd\L“Á«™(]b,ªe,úÖ=t]o-åñ~^¯Ä–=&ŠCe mÀ“4MZÒ“ ˜2          ®2                           2        _CorDllMain mscoree.dll     ÿ%  @                                                                                                                                                                                                                                                                                                                                                 €                  0  €               	  H   X@  ¨          ¨4   V S _ V E R S I O N _ I N F O     ½ïş     ½¾                               D    V a r F i l e I n f o     $    T r a n s l a t i o n     °   S t r i n g F i l e I n f o   ä   0 4 1 0 0 4 b 0   ’= C o m m e n t s   P r i m i t i v e   d i   s i n c r o n i z z a z i o n e   a s i n c r o n e ,   r a c c o l t e   a s i n c r o n e ,   T P L   e d   e s t e n s i o n i   d e l   f l u s s o   d i   d a t i .  
+             J o i n a b l e T a s k F a c t o r y   c o n s e n t e   d i   b l o c c a r e   i n   m o d o   s i n c r o n o   i l   t h r e a d   d e l l ' i n t e r f a c c i a   u t e n t e   p e r   i l   l a v o r o   a s i n c r o n o .   Q u e s t o  
+             p a c c h e t t o   è   a p p l i c a b i l e   a   q u a l s i a s i   a p p l i c a z i o n e   . N E T   ( n o n   s o l o   V i s u a l   S t u d i o ) .     4 
+  C o m p a n y N a m e     M i c r o s o f t   j !  F i l e D e s c r i p t i o n     M i c r o s o f t . V i s u a l S t u d i o . T h r e a d i n g     >   F i l e V e r s i o n     1 7 . 1 3 . 2 2 . 4 8 8 2 9     ~ /  I n t e r n a l N a m e   M i c r o s o f t . V i s u a l S t u d i o . T h r e a d i n g . r e s o u r c e s . d l l     – 9  L e g a l C o p y r i g h t   ©   M i c r o s o f t   C o r p o r a t i o n .   T u t t i   i   d i r i t t i   s o n o   r i s e r v a t i .     † /  O r i g i n a l F i l e n a m e   M i c r o s o f t . V i s u a l S t u d i o . T h r e a d i n g . r e s o u r c e s . d l l     b !  P r o d u c t N a m e     M i c r o s o f t . V i s u a l S t u d i o . T h r e a d i n g     R   P r o d u c t V e r s i o n   1 7 . 1 3 . 2 2 + b e b d 3 0 b c 3 a . R R                                                                                                                                                                                                                                                                      0     À2                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      (&    0‚&	*†H†÷ ‚&0‚&10	`†He 0\
++‚7 N0L0
++‚70	  ¢€ 010	`†He  s°¡må<çÍ)Á”«o´*ûÎóÏó"ÿVÚ8?# ‚g0‚ï0‚× 3  §¸û—]5„ì    §0	*†H†÷ 0~10	UUS10U
+Washington10URedmond10U
+Microsoft Corporation1(0&UMicrosoft Code Signing PCA 20100240822192557Z250705192557Z0t10	UUS10U
+Washington10URedmond10U
+Microsoft Corporation10UMicrosoft Corporation0‚"0	*†H†÷ ‚ 0‚
+‚ –TÊ‹zÒ°| ÜX•A]	Q\¢`ß8«iÉŠÿ~¼ıéñ¨^Vå!âwÆ¤1€„ˆãm€¥ƒõ1—(F¢CÒÂ£6Ö(‰'N%­ßáÍÒ´±ïŒª¡°Á?À
+%€5˜­Qç<}D‘5Ìug&põFÑeŒÆ&zñ~ªÀvÓMÅMi!†&cªñÜóX½D|R$a |ÉÄ"™ÿ×$¤ŠDÕøÓ‡=P¿’•˜5Ç`/I­c} ‹£
+.uë²ãTÑÄÂë>şu—×Tğ±öZÛõ³¼˜AÉ™ã]/­Uãv(D§K:Û…Âò:*ƒ—¬DÊ8; £‚n0‚j0U%0
++‚7=+0URºÍSp‡9‹nÇ(ÍŠiÁß+0EU>0<¤:0810UMicrosoft Corporation10U230865+5027030U#0€æü_{»" XärNµô!t#2æï¬0VUO0M0K I G†Ehttp://crl.microsoft.com/pki/crl/products/MicCodSigPCA_2010-07-06.crl0Z+N0L0J+0†>http://www.microsoft.com/pki/certs/MicCodSigPCA_2010-07-06.crt0Uÿ0 0	*†H†÷ ‚ %ÕÄCáCşæÚXˆŒƒÌ´LwJKæ¾ªŞ¬çºM[™7eTrë¾hRr„^ö”?
+¬ë¾˜¸Ït¶*¬Àã\ï$, >‘7ƒf‚/CÙ([ë‹.‹ØF6|?“Y	,ƒ¸†cŠ«':(ôx¦™1vü}W-ÏàÙ3éÁ²\(îH\‡‰u„‚)™Q7¦E
+M¿çû›k—Èyødš+HÛ9H¶ê¢İb±kÅˆDmkqA½õ1f³ivıw\l~ĞŠJ¤n˜J!ÙQVf)S$Z4æV7\ìn›Ì¢Üpâs†ƒBí²Oú´ÈÖ0‚p0‚X 
+aRL     0	*†H†÷ 0ˆ10	UUS10U
+Washington10URedmond10U
+Microsoft Corporation1200U)Microsoft Root Certificate Authority 20100100706204017Z250706205017Z0~10	UUS10U
+Washington10URedmond10U
+Microsoft Corporation1(0&UMicrosoft Code Signing PCA 20100‚"0	*†H†÷ ‚ 0‚
+‚ édPygµÄãı	 L”¬÷VhêDØÏÅXO©¥v|mEºÓ9’´¤ùùe‚äÒıDœèe“Î,U„¿}ã.+¨A+·¢KnILkŞÑÒÂ‰q”ÍµK´¯ØÌˆÖk”:“Î&?ìæş4˜WÕ]Iö²*.Õ…»Y?ø´+ƒtÊ+³;FãğFIÁfTÉ½ÄUbWrøg¹% 4Ş]¦¥•^«(€ÍÕ²åµcÓ²ÈÁÈŠ&
+Yìÿí€5L¦¾R[õ¦Úà‹HwÖ…GÕ¹Æèªî‹j-\`Æ´*[œ#_Eão7Ë3€j‰M£jfcx“Õ0Ï• £‚ã0‚ß0	+‚7 0Uæü_{»" XärNµô!t#2æï¬0	+‚7
+ S u b C A0U†0Uÿ0ÿ0U#0€ÕöVËè¢\bhÑ=”[×ÎšÄ0VUO0M0K I G†Ehttp://crl.microsoft.com/pki/crl/products/MicRooCerAut_2010-06-23.crl0Z+N0L0J+0†>http://www.microsoft.com/pki/certs/MicRooCerAut_2010-06-23.crt0U •0’0	+‚7.00=+1http://www.microsoft.com/PKI/docs/CPS/default.htm0@+042  L e g a l _ P o l i c y _ S t a t e m e n t . 0	*†H†÷ ‚ tïWO){Ä…x¸PÓ"ü	¬‚—ø4ÿ*,—•åä¿Ï¿“Èã4©Û¸Ü ¾Ò5o¯åy•wåÔñëØÍNa¢ÂZ#ğŒ¨bQEgã?<“ø0…È9@¦×³!)å¥¡iŒ"“Ìt˜ç¡GCòS¬À0işÒ% moaÓßÕÙr ,i†v=QÛ¦9HÉ7amİSË§ÖaÂ¿âƒ«àk›•Ö}(Q°‰JQ¤šlÈ·Ji©×ÜÁ~ÑIpª¶­»rGcú¦Ö¢¦†ì¨D›c¶²i‰ÇF†z?èÅ!Õ{ù#-ÅAË¿LÈï±œü"KIŠnã¦v[ÑSy‘…ÕÒÛ=s5ó<®T²RGjÀª•ÒÚ™g^2Œû7…ÑÜu…œ‡ÆZW…Â¿İŒ›-ë´îÏ'Óµ^iú¤§$gsÏMO¶ŞV—z÷éRMôwO…ÆØñíB	Ñvã#Vx"&6¾Ê±Œnªä…ÚG3b¤É‘3_q@¯˜eÉ"èB!%Š-`Ù7‰A‰*×a<”h`RïÖG™ €@îw>œàSP8•›f3'9x‡6ÎNÃ_²õ=GS¶àåÛa=*×’,Î7Z>@B1¤ÂVœ¿$]QjyÒÓÚÁ”{%qD«jæÔÆß#š–uÅ1‚&0‚"0•0~10	UUS10U
+Washington10URedmond10U
+Microsoft Corporation1(0&UMicrosoft Code Signing PCA 20103  §¸û—]5„ì    §0	`†He  ®0	*†H†÷	1
++‚70
++‚710
++‚70/	*†H†÷	1" ĞA!l’£]$ÆM9Q©O|ßv?X_û>¸\È~F¨p0B
++‚71402 € M i c r o s o f t¡€http://www.microsoft.com0	*†H†÷ ‚ ”|Ê”Ü§¦—22Şµp6èì79–æ…#˜Üg‡ k6!!âİmâ~×•õğ ğü;´ršl~>¤Ä]Zw_ãVãRÒ_U~d´‹û­‘ò^0÷½Œ×ù
+iW—mĞ&‚€¹`\5oµ Ö ‰Öû„D&~ñæ™¶0|§à¡ ßw[	çÅ"1ÛòYƒX¤ëj×½ Ò¯Š¢¾ù$¹†4@FV]Kçºú1ìàÑËs¸œbfEŸ8ûQ_«?ÁÎ‹\ã†‹Ï*ã©å½âbi!iö¡-€[¼.ø3¹%ÍA‚IÈ6×Æ+{;¼Ÿ	Tz¡‚°0‚¬
++‚71‚œ0‚˜	*†H†÷ ‚‰0‚…10	`†He 0‚Z*†H†÷	 ‚I‚E0‚A
++„Y
+010	`†He  ¥òáÄ¥y99O¹?esŞO÷×R˜?†±^××…«œÍ€g‘¥‹`20250124030916.671Z0€ô Ù¤Ö0Ó10	UUS10U
+Washington10URedmond10U
+Microsoft Corporation1-0+U$Microsoft Ireland Operations Limited1'0%UnShield TSS ESN:431A-05E0-D9471%0#UMicrosoft Time-Stamp Service ‚ş0‚(0‚ 3  úû;DÓw3ÆÓ   ú0	*†H†÷ 0|10	UUS10U
+Washington10URedmond10U
+Microsoft Corporation1&0$UMicrosoft Time-Stamp PCA 20100240725183111Z251022183111Z0Ó10	UUS10U
+Washington10URedmond10U
+Microsoft Corporation1-0+U$Microsoft Ireland Operations Limited1'0%UnShield TSS ESN:431A-05E0-D9471%0#UMicrosoft Time-Stamp Service0‚"0	*†H†÷ ‚ 0‚
+‚ ÊUÍÏeÀ_íò‡(0aUOë…y–Ò•w¦ò^nö´- ƒ[r:»iÀŠFÈ1—øFÂlxRå7x'F%sÍó´±m û3©*GEãú6pkı	ÌE‘d¹ğ‚]zzPéG"3‰Ìa›İB<›ŠŒç½cN÷&UïİRvDØ‘²OÊü»/<¿ärxæ„§´±ç´OCıê¦²'d‰¯#Æ®1Ğ'd£¢ÄYs¢Š!í,²pÁÑÓ¦EJ­yaéQ½cSƒZGà@¶(í›ÆÀMÛví1äïdXŠşÉŸÖT³AíşÓUÖ¡×‹{bO±—“øOñ| Ëìk« ¯&)4×ÖJ—•ÂwÓUâ‚k‰Wì 3˜µ6º	+ B[]OÂ-3şH½Ñ—éwÄÙ‚œ™»é1‹{g[ö?İ›¦)—ş%H&Ë“F¤ÑÀ«oÎ—m_hN&&ø"³fé*K4àk«–>sê6;¾Ï)KÂ·ßÂ 4©¼ÙÅ¾ FAIÀÒ^˜äKá·õì˜8m«p‚Á 9sS3–Í‡›C¿q'q
+¼./5 1´gÚù„®7b7¯°ö.‹”ïÊñ´Øn1t³hz¹|X†ß7,`všãì>bc+…13„€ŠÈwäè\ıOÔ+xU­ £‚I0‚E0UcŒr›/••êGtèª@za+Õ?¿0U#0€Ÿ§] ^b]ƒôåÒe§S5ér0_UX0V0T R P†Nhttp://www.microsoft.com/pkiops/crl/Microsoft%20Time-Stamp%20PCA%202010(1).crl0l+`0^0\+0†Phttp://www.microsoft.com/pkiops/certs/Microsoft%20Time-Stamp%20PCA%202010(1).crt0Uÿ0 0U%ÿ0
++0Uÿ€0	*†H†÷ ‚ ¸VÂ¢±k¾‡Fù“Iv>7>P¥L­AS›;&®¯º1F¸È¹±7ŒVt½dÊ–ä™ße=Õ¦çùo—š\şêF®µÅã«_wúâA¢Ij‹Ñ	kV2_QS„2øÏ6¥‡5Âséí½å±êÁ6y£¹Ø!ñ$í~>ˆKz2fÂO×&­rn$¢éÖõûŒâ®:6ı;Ó1zâ)P|¡´ÆĞƒŸó®Èë·®ÂˆÂR)ÂwœÅr|Ùg¿¬¯¶Ö3,­ğKíÀ•"l¶	0…Ä®G¥«¤c:½/tÍu¬s5Õ™Ñë‰m°BUô¹ó‹6A¼ğÁBPÑ5Ñ$›3ó ü&Ó’çÕ½z
+¢ÊÑÒ¡ê ÷_nåÃØÉ7
+•³:.…;cù%'HæÍIó§è¸”Ov”lµ–£m_ó{Fô›’}Œ=Á½=uŸöinıIØïÏåB%hóí *nŒÑ2vè¡„¬@·ş˜ÊM{ıÑ!ØÓë‹Ú¤HÈ&ß ¼8™O»{)Eö¤J„äİàu…Å–Ù’ôùÏ7C8wVÑ#¦6{`Nıå¡M†Èlzj`7À´-i‚{ÎÙÊeÆÜÃ¶ÁHá/ÑïIã¢«ªøêš÷ÁQÀv{’ú@!Îê¤Îíj0‚q0‚Y 3   Åçk›I™     0	*†H†÷ 0ˆ10	UUS10U
+Washington10URedmond10U
+Microsoft Corporation1200U)Microsoft Root Certificate Authority 20100210930182225Z300930183225Z0|10	UUS10U
+Washington10URedmond10U
+Microsoft Corporation1&0$UMicrosoft Time-Stamp PCA 20100‚"0	*†H†÷ ‚ 0‚
+‚ äá¦Lç´r!y¢Ë×$y½Õ‚ÓıîœÒ©lNuÈÊ5WölJàâ½¹>`3ÿ\OÇf÷•SqZâ~JZş¸6g…F#µÏw2Àè`}jRƒD·¦FkóÅvõ†PÜÁDÈq\Q17 
+8ní×Ø&S|9azÄªıri¯«¬ö6¾5&dÚ˜;º{3­€[~ŒRş¶èb%ÜjÏ]ôşSÏÖì…VMïİ¼¤ã‘²9,QœépiÊ6-p1È5(½ã´‡$ÃàÉ~µTÜúU˜mh;šF½í¤®z)7¬ËëƒEçFnÊ2ÕÀ†0\O,âb²Í¹âˆä–¬J»¾q©[g`Şø’‘=ı Ïs}AšFuÍÄ_4İ‰Öı¥ }~üÙEß¶r/Û}_€ºÛª~6ì6Lö+n¨Qè¿£Ñs¦M7t”4‚ğò·Gí§è™|?LÛ¯^ÂóÕØs=CNÁ39L¼Bh.ê„QFâÑ½jZasÊg¢^×(vâ3r×§ ğÂú
+×coÉ6d‹[ ¦ƒ!]_0t‘””Ø¹Pù‰aó65„GÛÜÑı²ÔÅkö\RQ]Û%º¯PzlÅrïùRÄ…“À<Û7Ç?x«E¶õ‡^ÚriÆ®{··>jâ.­ £‚İ0‚Ù0	+‚7 0#	+‚7*§RşdÄš¾‚‘<F5)Ïÿ/î0UŸ§] ^b]ƒôåÒe§S5ér0\U U0S0Q+‚7Lƒ}0A0?+3http://www.microsoft.com/pkiops/Docs/Repository.htm0U%0
++0	+‚7
+ S u b C A0U†0Uÿ0ÿ0U#0€ÕöVËè¢\bhÑ=”[×ÎšÄ0VUO0M0K I G†Ehttp://crl.microsoft.com/pki/crl/products/MicRooCerAut_2010-06-23.crl0Z+N0L0J+0†>http://www.microsoft.com/pki/certs/MicRooCerAut_2010-06-23.crt0	*†H†÷ ‚ U}ü*­á,g1$[árKü©oê\¶>NGdx±“—=13µ9×Âq6?Údl|Ğu9m»1äÂûlÑ¡”"îéfg:SMİ˜º¶xØ6.œ©‚V °¾‰èiàº	î{ßjo¾)ËnØ?HuÙŞm‚õm#TäxSu$W¹İŸó=Æóhßeö¤Vª÷•¶(U'Ğ$½@ ¿¶]='à@–8¬÷ù)‰Ã¼°T…B³ü‹‰çğjÂBRuŠ6ÂÃas.,k{n?,	xé‘²©[ßI£t¼ì‘€Ò=æJ>f;O»†ú2Ù–ôö‘öÎÆtıöLro«u0Å4°zØPş
+Xİ@<ÇTmctH,±NG-Áq¿dù$¾smÊ	½³WITdÙs×[DZ‘kŸ¤(Üg($º8Kšnû!TkjEG©ñ·®Èè‰^OÒĞLvµWT	±iD~|¡alsş
+»ìAf=iıËÁAI~~“¾Ëø;ä·¿´Î>¥1Q„¼¿Á‚¢{‰pşçµĞ(‰6ÚºLù›ÿ
+é4ø$5g+à¸æŒ™Öá"êğ'B=%”ætt[jÑ>í~ 13}¼Ëé{¿8pDÑñÈ«:Š:bÙpcSMî‚m¥Áqj´U3X³¡pfò¡‚Y0‚A0‚¡Ù¤Ö0Ó10	UUS10U
+Washington10URedmond10U
+Microsoft Corporation1-0+U$Microsoft Ireland Operations Limited1'0%UnShield TSS ESN:431A-05E0-D9471%0#UMicrosoft Time-Stamp Service¢#
+0+ ÷†~mBgúr°òêÈ47.Ú<6 ƒ0€¤~0|10	UUS10U
+Washington10URedmond10U
+Microsoft Corporation1&0$UMicrosoft Time-Stamp PCA 20100	*†H†÷  ë<ç‡0"20250123160631Z20250124160631Z0w0=
++„Y
+1/0-0
+ ë<ç‡ 0
+ ­ÿ0 `0
+ ë>9 06
++„Y
+1(0&0
++„Y
+ 
+0 ¡ ¡
+0 † 0	*†H†÷ ‚ ©ãkól—9H)¬ß“
+{¢¹6P>şXİ¥h	¡ ¶U¿B©ß‹ÿLëüø4——ÂV?.±`ô„ŒZ&
+W•t€ö—o)VvÁiãj6nY¯³K3ÒKáßD‘½°ŠÔ©Sg}ß'äÈ`ÁzåR—§‹l­û…u'^ë°CÙ{[åE´`Š#qX[,£»<Eéˆ‹`„,tù{V¡]rN¢CYP¬åKÃ¿J}Œ†~vş‰%Wa§6/d„héğõ…Ë‚Ä¬?~í‰Ç@¸…{Zƒ…¦kğäV!ù—J¼´¦#Œ±ÇF$ƒÎOõÛ˜¿÷ 1‚0‚	0“0|10	UUS10U
+Washington10URedmond10U
+Microsoft Corporation1&0$UMicrosoft Time-Stamp PCA 20103  úû;DÓw3ÆÓ   ú0	`†He  ‚J0	*†H†÷	1*†H†÷	0/	*†H†÷	1" |‰šËö’?éÄ6x>¼D{äc™.M"ë-.” bÒ0ú*†H†÷	/1ê0ç0ä0½ }ò-É¯>hãS÷i%0Ç¥Ê9¢RµŠnCV0˜0€¤~0|10	UUS10U
+Washington10URedmond10U
+Microsoft Corporation1&0$UMicrosoft Time-Stamp PCA 20103  úû;DÓw3ÆÓ   ú0" §Âf7GÃxSÉ§ø‹¾[”ù!éXY´¼`q®!’Ã0	*†H†÷ ‚ ~¶^V×ş$8¤HRŒU‡ÖP¢yŠ¥‘Ÿìvfx$;f-[<írBV¦¨6yë³2ğ¸·ñSì”aÙ1Ö˜‚}89çöéÑZ1d	Âµ†!â×6Zq
+êiùÜ{¬æQ¹' UtU 'ÅóX–—oêöİ^½Sj7f1°Äƒ¹šxCqr‹)ó Å:Ü c$©ELkÀ·'#"È¥~¡D˜ò³Š¾(§SÏT˜zÄnb‹NÀ¿· ¹Ó”Ù6=÷D‰P2»¢daëÍX†±ï?á™ı‚Ô\‘y•ÈcïƒQª§îrÑÃ»É÷ü‘Enaol÷ˆ¼54!å‰
+”Ê¼Û5¢1”œh'÷h3™Ì 0dÊ³1†AV!o\˜óJºÿÆGİnML\«d®ˆ‚Â=üÇ!7Š“©Ä°¿vÅ8@çâcfÇÍh ƒÿn¨‰ ¨,ÎDÕÚ;Èù¯O†^BñîëíÔD¸r)~((S4ÓÎàsòLïüÆ°§–:<½)=“–²¸Ø€	Üg9J2ÇlÀ¡i•4Bú÷‹'8ÑÂØ1úçRØœå
+éUè«Çºëİ Û:·p]ÏÕÒc$–õ–AlÚ³Ù(cdf¢
+/  ó¯j'srá"8å(u                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          L"ÓÀ‚©æ—ñº‹7XÊ#NñL”ózÒc8†ŠëY¨ ûÀ5ù;®çF1†Hô[\Wöf¡s3Ì,`¾8NÀ2Îrø9ø¹‚Å\œQ6;¶ÈŠu£Iu 7ı%ÒUAkt@y¨¶ {ºo—`õ-ÚÕZl(X"™eëJå‡©lâêÊªG›	Ã%Şõâ· —ß,Fp1‹±&Ò¡ï¤vÒ°t*š‹÷¢§Â ¹&™Í÷¢Zß£Tz’ºÔª8Î‰;
+šªCİâ=‹töŸ°]ªö•›’í©´·ºY•,—¡á’ú<•Íïš¡¯Î½zÛg×kIü;Ó àñVü~ñ	Z5 CÅÚQ'7h“.KâšEZ´ã
+ÿ 5«l?¢!Ö’oòÌÛÏÜÿjÇû]V<ì˜Ñ»œ:gÃe“^x÷‰«VnØ8àÈ“~ŠW6°XI+®ma%5 W³PªšƒD)ÁÅ8TÖÈBÍ,ZÙÊŠëûpY.±Ÿ¨ä N5p–ÀÀ‚'[sÑ‹ú<Í–(Ï‹p_ªf;…}0Ö‚…µšëBšXX1 Î,½/F+ôj=$6OìK*)‚M6ß¦8÷+T¦ûv‰±ñn¦ÆXDÜ‘ê¥RÓ5”J÷ÉŠå³#ğv¨ Ô:¶Â"º[øœXÌ,œQ…È1UË§Rt…#°tì¹)«íÏëå‘gFK‰R`$ª80ùÕÌ­Ğ6¨‹è GjË©Ğô‰ ‡Û-Îğw&Ë’L/HT¾Ã,[/X"½  Ğmí2±FëW¶§·&Ú½Âo‰I‰t3!ôaYµ½a²û?µ
+~ +ˆ	¹ ‹èŞè ÊìÌÅãrŸG8~VGàkôz%œå¹ï7oyûÓíĞ“¦y»ä–ŠSoXpää^<ë•OÖN|ìÍ·¾vöw­{Ê
+kšY¢´ŠU¶ôgåu,”(bÑÂKW7±L·¬°ª_—Ö²Te+nèËÒXAu;‹7s`A:ÀbŒZàT~7°Ör`áà’¨ä~™. +#u`÷&~dÓ‡„×	!K,²ı¸ 5V_nğõ*Ü%æjtOö¤\éf«l¿T¢ÊİTR_7;C›,¾ÄVìR‘—ï‚#ÚÂÅk'\¥ÍZ&@ }á’Ö€$×w££¡ ¢í¾µ¿¨Àya5¶pw€	 „wİë@ÂÓ¨hb„¬‹;¶Ùdqo”eË’¤n©:İkí]ä.+«‹4{{èru“A•ûÒÆDŸTÊUÚË*;/§DZI(}ÃáLàw¼^…:˜ğø}A*8L~-¨ä‚KGÎkp˜D¥—ŠsXî{Ï[Şşkvú¸»½N][}Ò5s:eÂ­S®\ûü£×?õö—¬yäûãoœËê†ìÃ*{ïÂÊê[Xy]3kíÕÎúÂzöíÏêš{°Šúî,]×“7ôáÍ•‘"D8U<r‰¦[ş0`Éº‘K ©¹1ráé1½û'¹&Ê:Z?J²ùcBèËš™æ5TêRİÛ»Dš¬Gª¯«ÌWUé3'„Ş*QåYÕìüÔæı æêJX¼‘A­êpÑï!ØWÛ]ïÄswÁ¹®¥jğ}7ğè„ÿõ"=@€!äZ\ş"JÔ²p²_¶8æòoVM’¤¾E‰ô %Ò\»â:)á(ª«ô×G»§úu¹T¬wñwu¤µÂk$e.!½2oËªí3»/õêHi‰F_®ş-Ó¤p@©°ø£ÿ‡/ÉÅú%ô²bo¦Ë(„ç-oÜNy»ïäQ·U¸aù§L¿ıÆË×>ñĞ´7>ø×ø'_ùaì=³Ó&Ìe{z,«oîÎÊÊËY]]ëŞ£'«kîÉ2½Xi]K•£;¿–ƒRgátc‡Àò[RaF€A*Mô»€áD%…4€9jÁ~,(*óÈEï„WŸ‰lúR’LïêÊ¿·8×ş¥şª’îEı»Dšl`Ék}¸¹(a/ì/e2!ô)I6hwE¿C€Åš]|drã
+t010°~É;sŞíPIjş¸ 0‹53_8Ãñ·˜	c¬-&‹ëUµ½C‰ô¨DåNÕszÒYØXá¯‰7Ç{tÉp@åŞ¶ºX’¸«d°LÔ¡«)•_ ’úÿÚ;ğ&Ïsï¿Ú’-Y²¶dÉÖ¶eÙòŞƒ $!$!MÚ¦9mÓ¦ã´M“f‡$d'a&@bö{ïeÌ2ÆÆà‰cƒŞ÷wİ$G$mzNû‘öù]×}ÉK€eóşßç^ÿK<¡´Óz*c9¥	Ä*à‡ıîùöé]øı6„ÿ³Â—É¯³ÖG¦Û™B¤P˜§§î”<;{_ä3³7İıÄGyÓ¦9{äÓÓe—>?UÑµğÈYxéFøãó¯Â=÷İ1n79Å	`‰KkB8RF‚%.t¶j­ß*,ØÂì	Áñ¯ÓøŠûßğ‹Ñ}=Ñï+R“™oñ™øÂ ³¡·½—tØ`G™HÖÃfó.{Û•7qCşdUÆF&G¿#æîÈ‰Ü´°¬°p±5KÀMcÖA‹sç;°=uè´âŸW»¯óê»"PHn¤¶£ö¤Ã0Å¦µ¤€ÆœLæ/øA
+‡ Tc«ÚØl^‹Å>ÎeóWqÄ¯hƒÉ‘òhSJXæ5¼ècLì£¼4Óh]'(^$mÂ,ö	â Éµ…|ÛÈŠ"‚œR°“+*ıA""şVÂı7…Ÿ|şíSmØ !+[Xû£‰•®~¡ÜÙ¼0û äÕ…#Ÿ™½şÁ)«ö½3cï‰]kŠ«+öÔ4·î,¯ë_ºk?L>&şü¿!yÌ°Å¥‚Îâ$u<¹ ™˜ÎšÊp÷7…NÖ;ˆ¸LWıûŞÁT¦ÒpÎ…Ìv|s Ó¿6àë€RãZƒk¨ÃÉ3c'oã,:/’‹£Ì€i\á×Ä³öJ‹ÿ¬)4Ê•b©
+|}ş‘>Be—9d|Å³,g»@Z)”êZ‚˜ÚÂôŒ¯ƒAÿßÛ<şVàë‰¢‚'"(Ø½äug…v³9<|ÍÎ±öV!7ø}MPXn¤ÜeI1äÜ1ëvÉ1•:•ñ6…H÷(‹ÅYÀ0L)ÃâTÅêk¼`E?Z*£`{^ÏxrbóunaÓÖòB4ĞX¿ÓzBmI$á³’ø{Ã÷¼ï
+E¸Ûs"J¯²Yœ·"BìwÄ…ò7yı‹“’WŸ´|´zßğOWoqÙîÃûvŸ)¾t®¾¡¯èr#ÌØ|œ¶ Æ?ñ¸rÆÉ•DZ–ÑDÌ7‚é
+û…%‡ 1ôQ¤ÅaÁ¨¡õéÄcÆ[ğÿâ4ú¾ ÀàÅ»›ğ?"šaÁŸfÏ$ß¡”œ^È:`Å ‹Í'K\#/âJ^6É"“Â‡iFÆNº#æa²Œ£”Qò¸X©@õ¬H(_Ìå‹OrEÒ+Arc—¯æ‚Bãz¹]ø.˜ßx:ñ¥Ã0ğõÉt]ÂMSD[ÎfqwóÙÂrê~Sˆ-Ò­IQæ˜ÇŞ¯Q w¹&qS¹KhTŒ-z‰ÔMXìB¾PV'–‡ßğ‚úN~¤E˜´ö¢²…
+
+«Ñ™zG&i(ÑZ“@ïHŠ[.ş·ÿÀ`ÿüüw	OXØA¥"Xÿ¨M{G4¡P(7®;+˜·é”ùÓuûs¦-ßôâG+ÖïšºnÓ…uÅµ+
+/våå—ÃÔµûà‰W§Á¨‡ƒ¨ä08bÁèò¬ÙÇ6e\dI†"½‹Q\Äa‘$e¨€ìí@"á¿SŠ—Ì­'ùÏ‡X2C€Åjï:v4á=®¸ÇEŒ8€6Î Ï‘µ§#ieX\
+¸—Íâ| ‡6d˜s\Ş1u‚xmN„^lÆçŒİV\¾øbDÓ&ÑØBp[ÉR”§EE‹¯İ×Ââ£¡F ïkh}0HŞÅR\esçYlŞ^/d®2Øø{‡Ü¬ÏÖ³ÜyÃ‹Èİ©ÿÅÉ´ß­rh¢BøŠŸ³ÈŠæ ‹Å-ç	$Í¼`Eç&WÌx6ø¾w²$_S¼'%ˆ'7² GâIê…Å'.¾¾Æ‘LBaIğ„O Âİğ;úy~%áVÁñ>—luÆ?Ky~°Ê<È°Ø'mºäÔÀïBùÁ0}Sç“ug5S—ç»_[°uâ_¬œ·hıö£k¿| ¢¾ûôåØ{®>şb	<üËß‚;g˜İ©€32aîĞ»2ÉzxOªÊ­™LñóÔ P›ÈŞ,Ïğ]”§ãÉ;h©5'xÂ’ÆÈTˆp¦‚!2™xÄà£¿!™o3^HÚÂÛöJf,fOÈMä‘ó†¿±âˆ;ÊÚX\a-Ãb0,ÖYpØO¢Â³#S÷İµƒ»“XÉº\µIâ@—ËØ,îWl6÷ŒH$oIÔí"±ªŸ´ãœ'ÁU>Z'¨-Édı¼W@¼­ËØp3H¦oáğD—XlîY‹½Ëæ*P?l
+‰Šv«Ó´9¦ñwdG2<vRhœi¸]#µşŒËÌaÖ~†Í=+”ê‚äÆvü>}kVHj5àÑwÂ&"ã»ÑÁ5ŞÄgUôñ\èñ"¯2-rk<	™ÅR“d&Ï×A×DB¨Âr¹Tzœ‹G\:8“G€-qèéä9c4ˆÂ<7^ø÷’ŸÜY8(5.PkcÉ2X†Ãí0Ef/L‹º‡NßSş=˜’w\:}é¾˜/Wo}há²u3f/\¼ñ¦­ÕûÏï.ml†òÖ.ÀZÌ³Ó>…a“Sb&h¬x"q€[…Í‰À“é€ƒYº¨@òˆ8"<8—w‡(X¯	s$“@añ…OXTä.Òşââ›
+¿EX0TŞÉs¯#áíBiIÚO&5¸°àßËpx›[Èfó—sÙÂÉz©-=Ö˜©Ïu=pGÜµçDŒ;±v9_9Å°æ²ö›J$
+­“JM2¹©E"3¶‰$ÚNXÕ$k–‡·ˆe†&‘XYÏå³ÙÜı,†½:˜òšR¤¥ˆ‹J	ËU³ÜsÇerWÒ¹)¶»ÂLª˜DWüÃ0;¹¼àãl¨†zC¢³xº©"I»º>2ã5»Û¦^‡Â›–Åßœ×Râ<fOêË'*¾@¡ğ‰Š¹\e¹ÂFg®äá`I½5†ØFfïïš­á‰:[™Ãã†„ÿ?¨-±À•i+R3~üøˆ”ŸÓ0Ê¿ÓV’Í]{Ô:}Ùöœ©_®ıíÇ«6¯œ¹aÇ™¹[w5ì®mêYS\Mj1¿šò!¤Ÿ†¨xˆˆŠs\(Ğ¡RE–`âPÖDĞßCºøá 5ÇÀ÷Ñ ë0˜öÂ;HìŠÁöcâã7ëâ[XĞ¿5<‚ñ]áÛ°ÌQ‘·=53ğ$Ê†+¸†{¡¼¾ğeBõ¤C†97zÂ13Ü<Š¯NR;dN»Z¨Í°EÏ³Î§l†³Ãâ­äq„_I„ÊÕ®x%›ÅE“©ÙBNğ+
+¡f¬Y­LˆH3SÜå|èÎİçº&Êc#²mŠ`ı$6‹ó9Ã0˜¾Ét?è&®Ç!wıØqeÀ4¨…¬òıŠÉß-,x¢VØ@¡p€B
+½gÇdğ”BN+ã_šL‰+‘¬T6]¨ÂÜ Â…°¡&•E@˜!d*›Ç¢Zk!®­êÈ™"ªér~lõˆÜ_Å¾&Ê¿ï¯*ä|¼ú¸fê’=I¯Ì\öø3ÓæNêÃù{¦®ß1¯èâÍ•×aññ*x~îJ÷³ß@db¨ŒVëŞ•1) Jµ=‰ÔcBĞ&Ü	¢0Ïvå¡À‰Ä·ÄâIW„ßf×é(»Ín²€ø[rqñ~ÍĞfg¯#$[$Å5şl®°a±£çF/ä76µÛ•b¾³|Õ‡[Æ
+²"†K3ŒÃ4é†aaia9ÆÃˆğ¬ğQ†lÓ(M¶i”w˜>ïN$7zBˆ+,Í¢ïpÅï1k=‹Í=ÅHêÙ"i;[¢$§aløcH:;qS4)|GÄ’…¦¾nÃ¿+n',*¯¨`hœaÁ”ş~B‚ÂâR[œçÑ’ !Dì UZA*‰D"a(„¡ 
+V“› •;ÂÒï‚È8m Í‘ş¤â±7–şäá‡¦¨_
+åß’ÉóÈ_[°ÏúÊœ¯F½0{Õÿ¼8kñ–Wn­Î;v®c]é%Xr´>Z½ûóK5ş!t“b¿3c¸²'’ã¾0DR¹™Ô‚p çNBuÀ„ª‘«QèˆĞ|£åØÛàÂ¼EH"¢I +æP#A`Û²_ ³#Şéªl©ä®WŒöÉ¬Å˜‰}2^`ˆ=/úÄˆ¤½,\ÃbávåMlçp™#-É4\øúP¾?£]’¹ShT\Wò¬wæäÃæV1\A3[$íÁY%¼ñ µ:¬ãáÎ®ğX¯¿g3¶.:tÎ,òö-M#ßXcñ|†ê,·iÏ
+,¸û
+÷–„¯k/Öx",ÁFÏK°ÜHl(‚$Z‡èA¦°“‹Î–´ñ 5Ø€“Z£aÔK¯Áäòê®U7à‹W°şî…•wD
+–Bù—ñÜô=¼çfì0¾ùÙúìçŞŸûâóïÍ\7mù¦¢ÕÇÏµl«¼Ô¿·ú
+,>rşòÑ,Èšğ˜¢ã@…wdV7ùÏ"‹ ‰DÁbˆ0%%Ó#SªF¡!ÂâïHè/.(,>yL§a`jMi‹#oË#nmqö!ÁÀ?/>‘ÁÕöØA†~M¯XÂAWĞÂfó«Ø,îÃúX.ÔÜåÒ¥²ãï¸}Xw:Ùö{ä…Û!å+c1ì%6aV9‡+lÈôİJk2¨"Ó='	ÜçmÛÅ·…r=ù9¢ıOÜä€­¾~bñ­ñÂ‚'ŸX`u€y;¿|\$°şâ¯Èàó±õ=H¦#XG‘EÄ’›Lyé\É¤ÔƒÌ)?~Y½Ş©¨…9=]nÂş©ªF½¾¼è¢Pşé¼<ç0wÊÂƒºwòvÅ¿>ıßübİ¼·¯8±¡¸´õ‹úØÕtVŸ½ œ¾ Ò'şLñÙdÈS!rO—Dj±Üã|HœqîÀ»¶…ø]ÜF`P8ü…Åc»ì	ü˜Ó¿0Æ¥5éæcK`ààÇ“‹%¶°hòoÂ;g¬1\a—t‘Åâ`fQ0WúH¤*Şšn}Ç´+ß‰Œ‰yDœ–cÔI,w	Ø¢©ØîÍ0¬b ä²$4¼WÚM©Ä*t²4‘@áPX‰xàÇIêËšDN)(.øyòµÀŸ÷-ñÂBº·¬n²»!ÄGN!jo«1)²‡'Î/_`ªë0¤ĞC—†O	6™˜ãAj‰ĞpÜ=f™Ù	ê˜dÿÛ§ ïØiØÛp¸ ïZWÕìªæ…Ÿ4d~²»^øºQ(ÿ±¼µ¤@öúâ}Ñ¯/Ù4ñƒåkg.Ø±ëàÜùW–Uvl¸Ô40ût)üú“…òğ/AïJ}d‚Ç#‹dád4iÛÄ–Y_§µõ›Åy\ùâ¾Ä;ÁˆXR,õMñ.ö–‹‰_s1…\XÔ4ÒÉ†%¼`az‰“#¦4Td»°o…Œ¯]Ód|‘ì&_ ¹Ì0,ÜK¶!ˆ+ù•IéLË¸#Ú•ïF»æ'‡…Yä.w0Oö4©›°8‡Yln5W ¹¢0÷`'.Å4©g­L4™psf¿ÏjÙ#‡‚¢±§yN'Şu@Cƒ¸á±ägøó¾%¾CX°n"¶}-,
+´“p$ƒÁ™:k
+hÍÉ 1Ä“P‡Å&"‘ˆ¦yqö¿Nms³=­5´XpÏ¾÷!-¯‚Š~€æA€Æ€7n,ª½züÓ3/Ï<Ü;c÷zcB¡Ü×WŸyoÍ1ËÛ«ögM^¸ö¿ŸûbåÒwî+|ùÄékï•×|PUonÚ
+?zşUpfŒ€0³¢cbÁ3ôúPÈ 6bêÁ³/g_ˆI’W`0õ€íÊÄ•’˜^y¶ĞbË©Î–
+Zozä»"°! 0¾«OOÄ‰Ñkë‹©¶ŸÃ_e±¹%èßÎf8¯èÅ©n}Š:Ûq÷dš,Çq¯,J›)¨ÿ‹aXËÈRP§L V5Š¤ú.ŸIYÓïµ>ÆVrÜê€íåØnîk;'3M~?“¿µÙ!ğó·şxÉ<Š•-•œŠğ´+L©5ÎS·#>Aq¤XgKCdXbG@xTìñ`‰J€ˆ˜Twg‚16ô±©àJÎ„÷>}ımØºnÀ  @m?@İ œîî«Ùz¥uÙÅ-æ¹øúQ(”ÛğêÊ“ìÉKó•/æíqéæŸLÛ¼cÎï6m=1fÃ¦Æwšº4¶ÀÖÒ
+xsNÜ;aDFF‚ÎÎd®Å oŠ™|Ì;!­öî¸ÂP…Ç“T„"Ìå™¢6Åİ"&ÿ¨°Ü^\<n‹xš"CyŠHud+1‡+jaV%Ã0Ç†5#T ©tGdÛÆq_£7F8&pRÂ‡ItsvWò:Ã0»†©âğƒ¤Z{;¾^\‘”ŠgkÂ×n•ş¢r;añ—@¡øG„ÅW€÷ÿ} Ÿ3ÆİÄh¬);
+ìIãÁ0lîLp¹!!5rÆ= £ø)¸sÆ€Şî¥Ù	æŒ‘p÷o‚‚ò*¸qó&Œşş~hëì„ö› M…—šv¸Òõ×•eÉy…òÀ×‘B¡ü¼²<_şÚÊ}Ñï¬Ú6nÎæİ“§¬Û¼gyQIuAÃÕã—›÷œ>s~	?ş8¤¥¥AtR&YîJ&¾08“Šp42‚<ÌAÒgjs"IE`[¡s‘¹|ü®´Â8Cãâ2´š½M°N£¶qñ	ŒEF$ëb±¹¸¾w“mr‚oWº©¦‘Á¯ÏdCn¨-ÔÌ‘üša˜ÍÃ:Êbs+8ñ5^ˆz g†ˆc¦ÊBN¡>Qñº¢ øbh Ökø³ù{…%p}`›[Šç&Ä»I7”7(åvPH"@j'-ÇZSØã²!=w=rFİv'ÖU,—?{ö˜³ÿÌ«ª‡•m]PÒçIuµôtv÷Ak{{WÓUõ­í‹Û^Ú]İ–¶¾¬O·ü\Ï¹BùAñÆºãâ7×¶½·vÏğë·?•·m÷ªõ‡
+
+W_ºzöÊµ›'Ê.ÂÊİ‡áŸ>É£ï‡È¤L0E¹ÁGüa"3Æ€{øD³cÚWÁ$ÚÖdBUvPj] 5y.bâ™ÀÀ:ø>>t!óßq†'o-È¢1íÂvj¾(´‡Í\a±8Ålg‡á¾`UºãSÍ£4w%ıä›&yŸÈ©ŒP	u¹l†ı‰w ´D iàˆ¤ø:õÿá¸qÁ>´×Í³Hó›'_ ‘œÏ÷Ä'·{Œï+*(Nøèû}ğ‰ŒÎ‘JN¿òP+È%&Ğhİ ·¥AtBÄ'$A\|"$¥¤yêù—`ã¡£p¬¹õôÃç7{áÓ›İğqO/|rõlí(€ŞšâÊÊM'JË^>PŞ˜µ½²‹®i¡Pş¼½¡õş¦BÕ'óãf¬İö£Ï7ï³ìÀá£³N¹²¬´²kå©Òî9ÛÂ_?œãı9¸ÒsÁ›¶Äp$ç‚9Áî,R0Uè] ÇŒJ;yô¿hÜ./4á_sÀP\Ğn±öº<â6]t»D¯O—“‹Ól¨™Lõ³Ø;Ù,îGZ±)×mÈÖôƒ˜LÓh©%4:ZÂ}’aXk†9ÃfóªƒÄêq¨±_(Áá?éêCdl|@Æ¢:Š°ÇfùëF_øñÑ'ßö?—ÀŸçí‚œ~ĞµÔœ@?.‹$â‚§aZtÛ¢À•”÷Nz^šò|¶h)\¹~:»»¡® ¿`óÍ>˜ÚÜS[Ú`Ê6x·µ­mAu]ñ‰òòUÇ.^úİ²¦ä-e7t[ËoÒÙ
+å_ÁÇÛŠe3·Œştİ	oç­üpòü¼ÍûJ+‹–×\=p¡ªõá“ğæüe0é·†¨¤LëŒä£sÄy:Ëœi Ê$ƒPµƒì
+ÃD ˜|ŸÀ-XÈõ¡:vaZ,@X<…èHRÿñù{à9ñş#‚ƒİO¼ yÃæaš¬˜a˜U¾â¡(mŠ=×9QøúÜ	d[Æğb5Éz}px*›a€¶‹}Ã\å‹B»…ñ¿ÁG|ı}B¢µ¥Ê’LÄ"Dë±ûıÆÆj?Qñ9†Ç~m­àmûşÖ®®@XğgLÄÅ[Oó	î“hÍ¤5Xau59F=òøËÃÎ#' ¹­®hèê‚Âö.ØÛ3 } »{¡Õ¥+—í?”¿rßÁ¹kÏ?º¦¸>~Mé5õºTP(”ÿ|²³4xæ¦SáÓ×íM_¸|Í«{öïß~ìLqeqİåÎ3W®Ã¶’JxoÕxâÕÈn²ÈÔDXT6·§[PÑÀ
+/äÿKa!" *şÂ2tQû†oŒW\ğâ©wÖTCTiCE×Í`¹|º¢Àá9ı¦P¬Â©ş"†a¶‹ù¡°«âc2­ãîˆ¹ôğáR»ÜåæHcfÃ0ùl·Z(
+m…hp{qè[ÅÉÛÆ8Ò@!Q›AŒëUp*Şá1#ˆÈ|ã¤â5
+¯°ëìß‘!Bó¿RGÃo…,±4'€Æ|[4d<ñ[xoë.ØÜÔ'z*ú Ê ªû 
+úÎô”õ@SSSGQQÑù’óç·—×Ô<¿÷\ÕØÅÇ/š–5Ñ–s
+åNá“¥¼y[OXo=ıùÊuÏÎ^¶ní—{Î,=[Õ¸¸´úæüÓåğòÒ0é¥w!—_Æ¦’¹“;ƒúÄà"ğÕ?|'’Û~;ƒ|1t—Œw´áÄÄ‹™ïB‰mĞ¤“à¸)MÑp.úIj,ŒœlP\°¨í)lëû¹‚&›WÊ0¬ïmpDNŒ.-"7ò¾éòËlËA”2Ş¢jG°Ö‡Ãì`1ì"GĞÀJ;Är#$jÀ”Ödh<¦u‚Xa"æjhñ‹ß7¶}£q¾şèÊˆ"ƒ­ádRİóÓ
+ßi?ç³D@¡öîó’ ¨DÄxÂ=şã;õÜN\0µ©w$Ö‘‹‹´cÍ‡vU¶Ğ9!qüà?½ 3.^†W›šáı®nø¢oöÀ²®X×Ù»nÀöÖöşsMMëê
+Š++g¿Pñ“}e—2×Ö›—i¤³(ÊÊ¼½¬Ï¶•(>^sÄùô'K~ìõO>üİçKw½°ïğÅ·Î^è{®¾Ì?	¯}¾zò;ö^H>R‡0W&¹ƒ&',ãÅ[X±HkO­3TØÊj‹=Âœiä9ú¨TP†ÇZLn™Òs#¶Ç:;ğ5&êmÀ³A1’\äpÒŸÔdĞyĞâi(ğÕ
+¾Í¨Ìg±ŒA/UfÏlŒ2øU+›+¬b¶+¯óåOÙÕ‰1™¶{şi+ÔGXîæ$ê2ŒF‰%ƒÏLeÖ†ÅÁÕôu¼ ĞÜĞO„*Md8Ô·¬Ó©§ÿÉÃÿôà«ø‹µ¯}}å1pCxt*	ü¸\é€ĞÅ":ÖÌ° »¸Ì1 ¶Ä€(Ì
+â'›]jK …-‘Lº£á¦âğ5&?o4ëŠÌ Só((h¯m‰I†èÔ\ˆIÊ {\
+¤¾~÷ò°#?š:: i`Uï Ìê„é=ı°¬§vvöÀšÆ–Öãu—K–UîİRtşóÅÕO®9S“»®°>bÓ¹æ-e7h‡…òCâõeÂ—¾Øñ‡kFş|ê¼×^\ºvËôE•{¯¶v\m…mE¥0kÉ*øó‹/Ã=ÿ”L<ã`
+Ş¥ÊÉ [4¹ˆù¦¹uèıâÊ$i4¼h…šÑùïœ½ äVR³ñ	–qÑÀLk"Â‚Â‚E}rÄ“ÑM‚œt¾‘&ûZT…E¬±~*3	¯ëa—@¬ºÊ°9†uˆÏ¦›³mr·-Ù8ò-2#m÷²SÂ²UPWŒ„+û#‹a­e1ì£~H5G ¾.éûÑJ —>ú6m†Üì$5Ğğ@„Á;›âúH´N4Ä·dÅ¼Õcå',r[elYµ¤·‚@iô¬rÑEBMÒræ„1DLd:\¥o%§XÒôáJğä&eÀ~ıß·q3”×7@ÙÍ>8ßPÔ°¥§¶ô¬ì˜×qö4·´_n<s²¦~á–’‹O®8^5>/¿Êµ¬ N½òä•éi’B¡üxyñ1Ñs÷ÿ:ocÚÓ³–ıú…¹‹–~ºõÀé=mÍí0¸­ò
+ñˆ™ğ‡ç ı¡ÇÁ™3)¹`MöÄádzZv¹‰ˆ‡o¿â%av²ÎWzøê+˜î¢HàIÅv"ÍSĞ9=ó3*'™{@wLÿ‚ô7ŠÕ~Bƒõ˜¡À¸7%é¨"B£±@¬leqø5Ã*Ä:‡€ô¦R c—ÅF%h2	ÚÌ¿ÙU–iº‹“f¯IÓYeN—Z¤˜Ëğ¾@Ñb±8e|¾ä*OÒÍæy¶
+xO$ş+åIã6b(,ÄcÇöõŠÿ–mŸÈ`  £ğûRTÆèTĞE&yvÀ}GÓmxBÁ¹%5šriœ “[ Di©R1ÉY5n$d“#LäNxœü¬Ï/€³µµp­«. \èØÓ7Hj'ûúÖ_½v}McË…3×[vÕ5¾»§¬î±¯Šj³W¼±ôDcÈ²‚«óõ¦P(?0&/ÍgMşr¿rògÛbşdé#OÏZ1ûÅE›ò§ï>}õË³õ}®´Ãª“Ed»rÎÄŸ€+5l±ÉÄ.Wr_MäK ™¶Æœ=^Ğì	$M†Aü6¼y}ÌócJLâõSÇ¦ËBñtƒi›P«G`°ı™ØÖ~‹¸|—Àèì ‹Ê"]U(2"™„R-iY…èù¢ĞÃªg×Çìf3œù¶è)	W6Z.Ğ$©…úX(,F-Ô»•m’Œ¯ÈsCÆ‰8â'y‹aaş0ÃbŸc³yW¸|q§ XÂ5±2ëœCK?‰Xx…e¨x~1	"*¶¸¿K\ğ}ß®7LwqÂ#	³ [oà°Hòçâë-UÙ@¦°‚Ré ¥ÅE=ŠÌ2iLXCI¨Ä\¸küƒ–‘‹LV;äŞ}?¼?o!œª¾×úªúÎöœê8€¢ÒÙù7nŞ,mi»XŞpuï¾ÒÊ6Uşr}IÍ]+OÕD®8İ \YxN(”ÿ^˜wPúôôÍ‘¿6Âco|şŞŸç¬Øµµ´¢±üZ+œ¾ÚëÎ\€·®€‰¿ø¸Ss ÜEN/¬³`îßà9]µùXw>*tQhP–Bfh[2
+ŠŠÆ2µØÑaÁù¼Àa
+mj±–à×š<To¸ÍúXÄönêÉ4¤Ğp_».v‘‘n2E„gVFl^P;‹Í»‚Sî‹§™SÃœeßÆN³,V	º/²ÙüKl®èš H~“+VbÛ3±[Mc©ŞI6`;4
+Š_`÷Õß(*ÚÈ$xñ‰‹OT0EXh÷¥Î$ÑÀ,Àè"€ÑD€H‹§+ÈäfIŒ !Db ¥"ÂL©`ŒÎ³3Â.0»â!!#l6Œ7Şûà((,‚kí]p³àb?ÀŞ®~XÓ×~–5·ÁºËÍ­®^-:]×¸`_YİïVŸª·àh…%ïøeùÒÓW…¿o
+å?ˆ§gîâÿeÖğg>];|ê¢5ïn9Z°o_qYÅšÆ;/ßXQXÏÎ]ã~õgˆÎ†˜P†Û!4ÌªÏP¥¯ƒÌ1iäQgO&]˜òÂSRP@ÈÛ($aŠg•g•ÿn²ÀTÎ·ŠW\Â¢²ˆ°C” ’ªÉ²Mr6D“C²”ÿ^±Á´±–j‰qšÇvY<±’laæÉÈ#ñ	ÁçÈäÔ…^!hÀ—¨É×£hÉÑó$ğtõ=D†„-~HT0Åå/*şõ§@Áçã	O*>QÁ”9©ÈÍS¡S™ 
+w‚Ív—ì®8ˆNÉ„Q÷O‚_ş÷Ÿ`ëpáÂ¸ÑÑİİİĞÕÕ•7akï ì ˜ÚÖŞ÷esKã‘ËÇ¶•M_ZPú³yÎ'ÏÙs^»ğp-
+…òM^]|„óö²ƒÓ–mÏ|wŞÒ?½<{ñ¢™»óOn¨mjŞÖÜÖ¿òr3üâƒépßÓ/Cê#e8˜\	`tÄ“å—zK*Ùb‹¡5%’MËÄwÓ.*I{‘â2®ù÷ZÕ¢­Äì‚ ‹¤VQv ù·8û·¾Şîcş»°d:+)nYdc³",Š´ìbÇNˆKpšİéÙ›…¸3ˆåz+ÄQ=KĞ²×ä¤ƒCŠp¥ºğ/ÜØF¬™Õ–¯}oEÅµümÅ_Xğ„‚‚Bj'¶O±>"Ô0dÚ(ä¤äLué¢ˆØøşm¾Ï‘¾!´–D°¹ÓaÄ½CrÖppº *.ÆMz¦Í™gŠ‹¡¥¥…1 \ÏÎ®Ò€üô=im_TrzWMıÊ­çªŸÍ;QqÏG;ÎØ§o?2g_-­›P(”ïæ•'ÙSòÈ'/ØûüÜÕ?ùëœÅóŞ\½éğ[‡]šy¥©gaU=|´ó ¸Ì÷ DÅ&õıVW*Ùb‹kÑ}â‚‹.Q\p¦¼°óHat“5ë>ßs¡5ø¶òˆş¾Ì·‘Û	¿° €ø6üâ#¾¯Œˆ&¡Â5îx±¶àœL$	<qaÈ°SM2M›L#yÃgšå3ÎB¯bŠEŠí(Ø:ıµhÜNTğ$FüNn#(CÂîí’ó	ŠWTH-OwŞÀ“éºÃ´"ŠŒWTH»²W€ğyø|St*ØãÒ!.%’2‡Ñl…”ÜQğ?¯M#Ç“ÍÁÈM ¸ Ç{  FÏ“Ş}Õµe;Ê*÷TÕ¼³ölù¤GË’gî+5ÌÜ[õo·”B¡ü‹xmi¾ôÕ%û"_Y¼mô›+6¾ğÉö½[?+<wq÷åæ®½­ƒëŠkaúÊ­ğ‹_ÿÜqq`tÑá³3äïÑs#ÌÆ¨t0Fe!2ƒœ$P8†,ií	 Åp$yfdn3|9K.ıƒO„4æ8²6[r±îÊ‚°¨40F&‚ÖäjÓÕ˜pÚİZ‹‹¼-ÁíÏLñY‡‚ÎÛØ1=•
+a19ŞºÑ×­ÁèÌ‰ï“ï'Àfà–¸MJo(µgpÎ–F±Ôho€¾†8P‡¹I @ã#Š‹o’«W„ÉI-*¬ñÃ >s$Ùt›
+±)™dN	Ó]«¶l‡’ª¸ÙÛë=@oo/YOß=°½½«sÅ•ëU;/7<QU5}ÇÙO,9~aÄ§Š­³TJfª¡§
+…òÃ««§¬:bywõşÜ·üÓôu[×|¶qçéµ'J®äW_é:q±6VÁƒO¿I÷üˆ¬D7º’ :ó.H5¢SG‚ÎC–â_•N
+ìjKÒĞğ1
+’À¸ ø‚´ßz…„=´Vt#tÇMS¬g˜O-¡t»´‚Ò:{‰o®üÇÚO4H±ZbU8…jÉÇ”¶D¯¨D’Gâïş¿¬£Háæ”a±¹ •¤X„Ç¹ yh­)àLÎœÈ÷j°“õ<8owº!1%’R³ 6!sGÁS¯L‚s  šÚ»HwWšxÓ^í­­­5uùç®\ù|[Yå×­ºgş‘s®YûÏ)g¬äş>P(Êÿï®=ÃŸúÕiı‡k&|¼f÷ıK÷|¸© °`gÉù†½ª{1M6y×xô­÷Á9şĞÅ¦€6*LñdG™3}é,we“¶ÀJCÂ!Tl$m°xN†3¿%°şğmÂ‚â§_ŒÌ}D¥“¶Z_Ú…
+ÿ>‘\"™nÈ/ë+˜öÂ† rá÷
+ĞŞ'Ó±i ÅPçÌ"øgø§ênşi½[ıTqÄº×hÏ½%ÍcßkJ$§˜pg&DgMsL*È4ª`r%+gÄ»†˜¤4¸küøŸ—^ƒ¯vî‹ÍÍp j<;ºğçOZ»º:ë¯]»X}¥éĞ™‹—§ï/©zbÍ‰²±
+*c¯ÓÌ?^/
+üÙS(Ê?©‹¥37Š¹ùÀ½y{|wäøŞö®|îø™Î—N—À
+àé…‹aä“ gÎ]`ˆŠ'>1Vw*™‹	s¤‚FjE¨$PÉ#ÉâI²&æ["Ph…O,Ø•†bâó!ùĞ0R”'ûÉŒ1CSñ¡ÆXP˜HÍßÇéù`œ ×X<uœÅÁ÷½õü³ˆğxk(øx‹X|ŸÀç{İ<•†PcHZÏ™¶¸ˆËCÒŒ8	;I£ïƒ˜Ì‘`KÊGúpHºë^˜¹0Î”–BW?q`¼: PÔÕ{ºa?ÀÆÖö–‚†kçv¯\÷Õ±â——.¹É‘ŠøGjÔ\¦ó&
+åÎ`êÆbñ‡›OÛŞYŸ?ìù¥›Ÿ²uïŠ÷+ùôtiË¢ŠZ˜UPÏ}±yæ%ˆJÍ…ˆØd27áHÌgêİ`vmX"éC˜@1ù>Â‚­ÎÆ¨dâµï‡ÇdCXt&¹è£8¨­)¤ÈíÁèÌÈ“¨xU_ÌĞ'ÑÚzEŠğ¡ÜĞ-R{‚”¦¾`u`h·—ÖN¦ùQpF‡1±.‚-Ë(2aÑÃn‹ïÄùa’¾³Äå€#e$9éE§äBbîâ±ãHÌ€ˆØˆs<ûŞ‡°§¸®÷Yú¢½o]w9œé‡Ã×oTl)*Ù±öì…éyÇÎıfö¾’œY{ÊÂç¨ş<)
+åaÊš"Á+«^\r(å™EÛñÌ¢Mó^Y·ãàŒCu«ÏUô|UVo®X¿xõ=Èšğ˜b’Èº“3‰t/‘»+“,µüÖ¸Øø‡¯†‚i1R{±ã¾³X"*8ĞÈp…m¾¸†/”åBòy¼à\nĞn.W´ƒÃmç
+$[…ÁÊ­A!ºÁRı~¡Dsœ'”åC*¤º¨«AŠğl3Æ¡Oôv'Û¼+eü;ÔnB¦¸\0Äd{ÂELÙ¬ña6'˜b iÄXøÕ¯Á¦‚“ĞØİıƒ XŠÇ!Fœ?¹90 } ı]ııMWšNí=W¾tÙñÿ3ï`É½Ÿî:çşdg™fú®JêsB¡P~8L^QÈ~cùiùkKó//Ù7vê¦#¯-Î?»wMIYíÉkí7wUÕÀÌ-;áñWŞ€”û{æhæô‘`Ë¹UL¾‡°à`!~^˜q™")¾"qµÊ€P¢­”I#fh¥–ÇÌ¡Ñ#íòØ§2>&F“£I±ÇèÒn}†#ÖiÏ±»#²#İ9n—13Ó®OcKyH«t¾j™'Rìå‰B¯à­-´–rj	’Àÿ@!Ä…rl°aû²v‹N€Øaã`Ô	ów„ãµWÈœ	¶×ôêê!¦YXC€¶ÎÎŠÊºË;Ÿ«Àõ*?™¸<mæŞ
+Ã'{*i‹0…BùáóîÚâà÷Öœ²½µâÀ¨w×ìúë”×¬,©,ÙÖÜÖ²®±æœ†?NŸÙ?û58‡ƒÈÔá`MÈ+Ş©'ä’TZ)càFeŸàÜ‹*2‰„.:Â"ãIš+ûr·/©1jP¬4Ÿ)gYB£­1ê¤¸Ë)Á8LàT§ğ¬ªøX¥ÌüW$kÆiıPCŒgè3gW¾RàÇ®7Ÿ?½ß
+|ÿ¥’Ø€€§“Ø¬Q9É9?ònøé³¯Â²ü3p®«Ÿ˜e•¡˜ô lè„ƒ½ [ûa`o/´–vvŸ-ºX÷Åá²Úßï8W?jé‰ÚèÅÇëTŸ®ç~
+…òƒçãMeÜ©ëJ”o®<óÜ’=Ÿ]¾õÃ™‡NZz©éêúk7úV—ÂÔE+àşÇŸ„Qã„¤¬‘š=
+ÒFÜñÙ÷É•J£Q¤é.\‚‹%V7Hq`ˆÏ‚ôa£ >>’S3À5ŠˆG$i
+’è>7ÉÀ×?J´:5È¬ŒIåp…gxÙ¦jI ^3|£‚Ã 1D‘tnğmP©¼[”Şbƒ¬½Áï	kN)))0vìİğÔ3ÿk·ï‚K×o@ T ,í$æYèu2¹£sàæks¯knÙxöJÓ;{ª.ÿhıùFó†-’Úè¼	…BùÏá¯JÄo®9åxuÕqS×ïykÁC;·•U^:yµµm[å•ö©+¶À?	®¤4ˆJL‡ôQã!}ì<b"ØrÁ—MŠôxbÑ8ÓAïÎCÂHˆÌ¾—ÎqÄ¦æB¸+™¤•xRuT¬Jlàş[şQÌ¡Ñruˆù¿†©„†‘n2v$æŠˆ† ƒ$˜‚ó.ŞÄ¡FÜÜLÖ«˜H§¶[cSÉZƒ#ì1ñ·|9Bk{;)ÂÔö¬í˜İÛ/ßh˜ÖÚÑ×puïªš÷7—Vÿ|ãùËÃW—4:×Ÿ¿N-})Ê6oo(¾»¡Ğôî†é3¶åÿxÉ‰â9Ë8q¸¶áÒ±æ¶îµç*à…y_Âˆÿ¢H[m6$IÃî†ØÌ1™8ŠÌ{`Ër¨ÔI¨5¸:&”šHk@ 
+‡Ëæ/–ñå™š`4ğßñ}	“XMªóÏxÉN†ÃëhÍ`KñÃH+³o‹²Ê„)ØLN:¼t¶ĞGX‰X&æŒ‹;…´`ùÑÏ`Éö=PÛŞE„¤ ú `ÇXy¹¹mA[gÃö^8µúâ¥5Û*ëş²â\ı]óO78¾8sU¾¸¨õNíQ(Ê¿-n+U|¼­(æ“M',ÚlÊÊüS‡.¹4÷\ÅÍÙEçá­Í;áÏÏÜ=)c'B\Æ0ˆIÎ G|.„;†C¸1tJ7ˆ
+pƒ ˆB^0	B€Ï‹aÕ°ö‹ÿ[	/$K¤³e¥YéZÕ1ßYƒ0‡Fr"¤Ö}p¸ZÆWåqDsç4[ n7¸rA¦Ô\m £#Ô¦r2	Õ{v©#"AmvFgJäŞ3RFŞã}æ,YuÍÍd•J× @ÙÏuòÚ{`cO×–~hÜu³÷äÁ¦ëKw\¨~uUaù/–_Jº!â‹SM´M˜B¡PşŞÛ\üş¦“¶÷Öõæ’¯şwğøòÙ%å¥¯¿1åä™şGà“µëá7¯¾ã}Fİ}Œ7Æ®´»='¡ŒŸB„B1°Ù\`sxmÃT “$zÓ³XìU<¶àÓ ¾ôY©@ñ˜\¨yP!ÔŞ§éîª'„?æI+äMæ°xóYk#Ã°N²Ù¼«B‘8\h‰ –!T‹&eNĞšcÈéÄìÎ ',kr.8³GCÖø ÷¡ŸÂG¾„c%%ĞĞ7¸ş±O&ı@Šò»{–µõ\YUUdç™ÒekO½³êäùÇòN\È˜w¬Ê´àdCÈüSß)‚
+…BùŞY_ š¶áhÊÛK6<ñÑš³óöÜ»´úÒ…Eµ-{ŠKûVî;³—­†_&>8	œîDÒ¬³AHxğd:`D!À
+’Ã#‹/–PAğ ›+èdsøMl6·šaX¥Ã` Á~ãÇX,v9‡Í­çrø-® ‡ÏC°DÒP#pøb²e8Diƒ#l	Ã<şğ±É ³DÖ)c'Àó3>ƒCëÈúÎA€ëƒ@|âKº‰W|eï@Wy{W]Ù¥+G7œ)–w¬ø‘GKSg*‹˜Ÿ_úyíê¢P(”ÿSŞßT(Ÿ¶á¨köæ£æ¬Ùø—G->t¾üøW5õ—v]iê<ZU»ƒ…+VÃİ<±©Y3ş~°Ä§“9©ÃŒŞÜ0+0ª0`d*`D`xB`ó…ÀƒP|¾B$
+	–C°H
+~ğ¸àóEÀˆ€Í[O LØŠ0™¢«ĞCÊ !a­0ü‘ÿ‚¹ë6AÑåF(ì8Ò°ğ½°³¥òûağj?´·ôVW56:U]»ğhyÍ–.3ëP™uÖÑZÉœüK´«‹B¡PşÙLÛZ(˜¹í¤iÁö#ó¿ÚüÈÒM[§:Y¸ukí¥ª5-íÇZÚúš[ÚºwíÚ3fÍ‚G{âÒsÁ3
+”VÔF`:`Z`¤J`‚C€	’xBl¸ğ¹"ğƒÇ.?Øøyq0b)0290r%0zü³P ÄÀ(µ`¼{Âà}/Lî=tµNvõzÉ…€İı6á…=y=íy­íµ'›v\¨^üÕé²gVª¿ğDuìœcUÚ9ÇêhB¡Pş1{×É»O™—íÎÏY»}ïÏ7ÎÿìHQI~SSSCKKKOss3ÔÖÖÂ‰'àó¼<øéïŸ÷ˆ±‘”	rG…Y<ƒ!× #W#S_¬aøA
+b9ÌHÕ1ÒG c²£Ğ cŒ &.˜‡ù[oƒ{ëV˜tñ"Ìïƒ¾=}{·ôÃÀúu}×?kn¹øE}Ã±•—m©jø3º/Î:T=÷hµâó‚zºZ…B¡Pî$¼ÀZsäœ|í¡ÓÑ»òO,*)™^__ŸéÒ¥ŠºË—¯]¼ÜØ]uù2”Ö]‚ÂêZØu²í: ïæ­„?¼ùŒıÍ!şGÁ1r<˜Ò‡CìÈ{Á=Ü‘#î×øI÷ğÏ`Ø¿ƒ1xİ±:|^ª¨†·[ÚarGwÿ_ºº{?ìèîø¬­«¹´j«{*Š;:Îœ¼Öz ¤±ù³ı5—·ö\ÍØE'+>/¨›s¬zÃS(Êõe‚­ÇÏEì8Uwø\Å½'+j§ì/)_|øì…=ùgÏ>VRz¡¨¼ªş|Yeóùªª–‹u—;››ûZ:;¡­»ºzz şêÕ¾ºÆæln¸Ö
+M7n@SGÔwõ@yO?”´uöhëìªkkk»ĞŞÕ\ŞÕSWİ;PŞÖ7xêÆÍŞ¯J›ÛŞ8P{å§›Î×ŒYy¦23ïtuÌ—…uº…—©˜P(Ê™§«ëÊTkY6.ŒßqüÌèü³ç9SVù\EuíŒòòª¥eeeÊÊÊöTTT»páBaiiiIKKKıµÖÖ+---W¯\¿Ş€ÑÒÒr©µµõâ7*;::JoŞ¼YØpkò0«¶½ë©£5õ¯9S:2ït¥}á™*ÙÂÂ:šâ¢P(”gvW³ö•V,­Væ_¨ÖŸ¬¨/©ª*¯oˆmhmMëìîÑ××7±¯¯ï©·?œ>888­¿¿ÿ¥¾¾¾ßvvw?r­½ë¾êë7Æ®oÈŞ[Q·å|é«ÒZåŠs5ts0…B¡P¦ºáëbc·áZ«°±¥EÒÒÒ¢nmmÕİ¸Ñ¡okkÓ¶µµinÜè_km—6´¶‹j®µÊšnüŸí£P(
+…B¡P(
+…B¡P(
+…B¡P(
+…B¡P(
+…B¡P(
+…B¡P(
+…B¡P(
+…B¡P(
+…B¡P(
+…B¡P(
+…B¡P(
+…B¡P(
+…B¡P(
+…B¡P(
+…B¡P(
+…B¡P(
+…B¡P(
+…B¡P(
+…B¡P(
+…B¡P(
+…B¡P(
+…B¡P(
+…B¡P(
+…B¡P(
+…B¡P(
+…B¡P(
+…B¡P(
+…B¡P(Ê¿†ÿ7ƒf_ó.    IEND®B`‚
