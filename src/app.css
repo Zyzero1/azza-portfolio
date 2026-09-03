@@ -42,8 +42,8 @@ footer > .site-container {
 }
 .home-mobile-nav button:last-child { border-bottom: none; }
 .home-mobile-nav button:hover { padding-left: 0.5rem; }
-.footer-row { display: flex; align-items: center; justify-content: space-between; gap: 0; }
-.admin-shell { background: #071426; min-height: 100vh; }
+.admin-shell { background: #071426; min-height: 100vh; display: flex; flex-direction: column; }
+.admin-shell main { flex: 1; }
 .admin-panel { background: rgba(7, 20, 38, .88); border: 1px solid rgba(0, 240, 255, .12); box-shadow: 0 12px 35px -18px rgba(0, 240, 255, .33); }
 .admin-item { background: rgba(5, 11, 23, .6); border: 1px solid rgba(0, 240, 255, .12); }
 .status-pill { display: inline-flex; align-items: center; justify-content: center; border-radius: 999px; background: rgba(0, 240, 255, .08); border: 1px solid rgba(0, 240, 255, .18); color: #a7f3ff; font-size: .72rem; font-weight: 600; letter-spacing: .04em; padding: .35rem .7rem; }

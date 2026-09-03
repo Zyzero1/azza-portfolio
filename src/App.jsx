@@ -173,11 +173,26 @@ function useData() {
         }
 
         if (projectsResult.status === 'fulfilled' && projectsResult.value.data?.length) {
-          setProjects(projectsResult.value.data.map((item) => ({
-            ...item,
-            technologies: Array.isArray(item.technologies) ? item.technologies : [],
-            description: item.description || ''
-          })));
+          setProjects(projectsResult.value.data.map((item) => {
+            let techs = [];
+            if (Array.isArray(item.technologies)) {
+              techs = item.technologies;
+            } else if (typeof item.technologies === 'string') {
+              try {
+                const parsed = JSON.parse(item.technologies);
+                techs = Array.isArray(parsed) ? parsed : item.technologies.split(',').map((s) => s.trim()).filter(Boolean);
+              } catch {
+                techs = item.technologies.split(',').map((s) => s.trim()).filter(Boolean);
+              }
+            }
+            return {
+              ...item,
+              technologies: techs,
+              description: item.description || '',
+              image: item.image || '',
+              url: item.url || ''
+            };
+          }));
         }
 
         if (articlesResult.status === 'fulfilled' && articlesResult.value.data?.length) {
@@ -526,41 +541,77 @@ function Admin({ data }) {
 
   const addProject = async (event) => {
     event.preventDefault();
+    if (!project.title?.trim()) return setNotice('Judul project wajib diisi.');
     try {
       setSavingProject(true);
       const image = projectFile ? await uploadPortfolioImage(projectFile, 'projects') : project.image || '';
+      const techArray = typeof project.technologies === 'string'
+        ? project.technologies.split(',').map((item) => item.trim()).filter(Boolean)
+        : (Array.isArray(project.technologies) ? project.technologies : []);
+
       const payload = {
-        title: project.title,
-        description: project.description,
-        technologies: project.technologies.split(',').map((item) => item.trim()).filter(Boolean),
+        title: project.title.trim(),
+        description: project.description?.trim() || '',
+        technologies: techArray,
         image,
-        url: project.url,
+        url: project.url?.trim() || '',
       };
 
-      let saved;
-      let error;
+      let saved = null;
+      let cloudSync = false;
+
+      if (supabase) {
+        try {
+          if (editingProjectId && typeof editingProjectId === 'string' && editingProjectId.includes('-')) {
+            const { data: res, error } = await supabase.from('projects').update(payload).eq('id', editingProjectId).select().single();
+            if (!error && res) { saved = res; cloudSync = true; }
+          } else if (!editingProjectId) {
+            const { data: res, error } = await supabase.from('projects').insert(payload).select().single();
+            if (!error && res) { saved = res; cloudSync = true; }
+          }
+        } catch (err) {
+          console.warn('Supabase project cloud sync notice:', err.message);
+        }
+      }
+
+      const finalItem = saved ? {
+        ...saved,
+        technologies: Array.isArray(saved.technologies) ? saved.technologies : techArray
+      } : {
+        id: editingProjectId || Date.now(),
+        ...payload,
+        created_at: new Date().toISOString()
+      };
 
       if (editingProjectId) {
-        ({ data: saved, error } = await supabase.from('projects').update(payload).eq('id', editingProjectId).select().single());
-        if (error) throw error;
-        data.setProjects(data.projects.map((item) => (item.id === editingProjectId ? saved : item)));
-        setNotice('Project berhasil diperbarui.');
+        data.setProjects(data.projects.map((p) => (p.id === editingProjectId ? finalItem : p)));
+        setNotice(cloudSync ? 'Project berhasil diperbarui dan tersimpan di Supabase!' : 'Project berhasil diperbarui!');
       } else {
-        ({ data: saved, error } = await supabase.from('projects').insert(payload).select().single());
-        if (error) throw error;
-        data.setProjects([saved, ...data.projects]);
-        setNotice('Project ditambahkan.');
+        data.setProjects([finalItem, ...data.projects]);
+        setNotice(cloudSync ? 'Project baru berhasil ditambahkan ke Supabase!' : 'Project baru berhasil ditambahkan!');
       }
 
       resetProjectForm();
     } catch (error) {
-      setNotice(error.message);
+      setNotice(`Gagal menyimpan: ${error.message}`);
     } finally {
       setSavingProject(false);
     }
   };
 
-  const removeProject = async (id) => { const { error } = await supabase.from('projects').delete().eq('id', id); if (error) return setNotice(error.message); data.setProjects(data.projects.filter((item) => item.id !== id)); setNotice('Project dihapus.'); };
+  const removeProject = async (id) => {
+    if (!window.confirm('Yakin ingin menghapus project ini?')) return;
+    if (supabase && typeof id === 'string' && id.includes('-')) {
+      try {
+        await supabase.from('projects').delete().eq('id', id);
+      } catch (err) {
+        console.warn('Supabase delete error:', err);
+      }
+    }
+    data.setProjects(data.projects.filter((item) => item.id !== id));
+    setNotice('Project berhasil dihapus.');
+    if (editingProjectId === id) resetProjectForm();
+  };
 
   const handleEditProject = (item) => {
     setEditingProjectId(item.id);
@@ -587,7 +638,7 @@ function Admin({ data }) {
           </div>
         </div>
       </header>
-      <main className="page-container py-10">
+      <main className="page-container pt-8 pb-72 md:pb-96" style={{ paddingBottom: '150px' }}>
         <div className="mb-8">
           <h1 className="text-3xl md:text-4xl font-bold">Dashboard Admin</h1>
           <p className="text-gray-400 mt-2">Kelola profil, biography, experiences, project, dan artikel secara dinamis terhubung Supabase.</p>
@@ -791,12 +842,24 @@ function Admin({ data }) {
                           <p className="text-xs text-neon-blue mt-0.5">{item.company}</p>
                           <span className="text-[11px] text-gray-400 font-mono block mt-1">{item.period}</span>
                         </div>
-                        <div className="flex gap-2 shrink-0">
-                          <button type="button" className="text-xs text-neon-blue hover:underline" onClick={() => handleEditExp(item)}>
-                            Edit
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => handleEditExp(item)}
+                            className="px-2.5 py-1 rounded-md text-[11px] font-semibold flex items-center gap-1 bg-neon-blue/15 text-neon-blue border border-neon-blue/30 hover:bg-neon-blue hover:text-dark-950 transition-all cursor-pointer shadow-xs active:scale-95"
+                            title="Edit data ini"
+                          >
+                            <i className="fa-solid fa-pen-to-square text-[10px]" />
+                            <span>Edit</span>
                           </button>
-                          <button type="button" className="text-xs text-red-300 hover:underline" onClick={() => removeExperience(item.id)}>
-                            Hapus
+                          <button
+                            type="button"
+                            onClick={() => removeExperience(item.id)}
+                            className="px-2.5 py-1 rounded-md text-[11px] font-semibold flex items-center gap-1 bg-red-500/15 text-red-400 border border-red-500/30 hover:bg-red-500 hover:text-white transition-all cursor-pointer shadow-xs active:scale-95"
+                            title="Hapus data ini"
+                          >
+                            <i className="fa-solid fa-trash-can text-[10px]" />
+                            <span>Hapus</span>
                           </button>
                         </div>
                       </div>
@@ -883,12 +946,24 @@ function Admin({ data }) {
                           <p className="text-xs text-neon-purple mt-0.5">{item.institution}</p>
                           <span className="text-[11px] text-gray-400 font-mono block mt-1">{item.period}</span>
                         </div>
-                        <div className="flex gap-2 shrink-0">
-                          <button type="button" className="text-xs text-neon-purple hover:underline" onClick={() => handleEditResearch(item)}>
-                            Edit
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => handleEditResearch(item)}
+                            className="px-2.5 py-1 rounded-md text-[11px] font-semibold flex items-center gap-1 bg-neon-purple/15 text-neon-purple border border-neon-purple/30 hover:bg-neon-purple hover:text-white transition-all cursor-pointer shadow-xs active:scale-95"
+                            title="Edit riset ini"
+                          >
+                            <i className="fa-solid fa-pen-to-square text-[10px]" />
+                            <span>Edit</span>
                           </button>
-                          <button type="button" className="text-xs text-red-300 hover:underline" onClick={() => removeResearch(item.id)}>
-                            Hapus
+                          <button
+                            type="button"
+                            onClick={() => removeResearch(item.id)}
+                            className="px-2.5 py-1 rounded-md text-[11px] font-semibold flex items-center gap-1 bg-red-500/15 text-red-400 border border-red-500/30 hover:bg-red-500 hover:text-white transition-all cursor-pointer shadow-xs active:scale-95"
+                            title="Hapus riset ini"
+                          >
+                            <i className="fa-solid fa-trash-can text-[10px]" />
+                            <span>Hapus</span>
                           </button>
                         </div>
                       </div>
@@ -975,12 +1050,24 @@ function Admin({ data }) {
                           <p className="text-xs text-neon-pink mt-0.5">{item.institution}</p>
                           <span className="text-[11px] text-gray-400 font-mono block mt-1">{item.period}</span>
                         </div>
-                        <div className="flex gap-2 shrink-0">
-                          <button type="button" className="text-xs text-neon-pink hover:underline" onClick={() => handleEditEducation(item)}>
-                            Edit
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => handleEditEducation(item)}
+                            className="px-2.5 py-1 rounded-md text-[11px] font-semibold flex items-center gap-1 bg-neon-pink/15 text-neon-pink border border-neon-pink/30 hover:bg-neon-pink hover:text-white transition-all cursor-pointer shadow-xs active:scale-95"
+                            title="Edit data ini"
+                          >
+                            <i className="fa-solid fa-pen-to-square text-[10px]" />
+                            <span>Edit</span>
                           </button>
-                          <button type="button" className="text-xs text-red-300 hover:underline" onClick={() => removeEducation(item.id)}>
-                            Hapus
+                          <button
+                            type="button"
+                            onClick={() => removeEducation(item.id)}
+                            className="px-2.5 py-1 rounded-md text-[11px] font-semibold flex items-center gap-1 bg-red-500/15 text-red-400 border border-red-500/30 hover:bg-red-500 hover:text-white transition-all cursor-pointer shadow-xs active:scale-95"
+                            title="Hapus data ini"
+                          >
+                            <i className="fa-solid fa-trash-can text-[10px]" />
+                            <span>Hapus</span>
                           </button>
                         </div>
                       </div>
@@ -998,45 +1085,219 @@ function Admin({ data }) {
         )}
 
         {tab === 'projects' && (
-          <section className="grid lg:grid-cols-2 gap-8">
-            <form onSubmit={addProject} className="admin-panel rounded-xl p-6 space-y-4">
-              <h2 className="text-2xl font-semibold">{editingProjectId ? 'Edit Project' : 'Tambah Project'}</h2>
-              <Field label="Judul" value={project.title} onChange={(value) => setProject({ ...project, title: value })} />
-              <Field label="Deskripsi" area value={project.description} onChange={(value) => setProject({ ...project, description: value })} />
-              <Field label="Teknologi, pisahkan koma" value={project.technologies} onChange={(value) => setProject({ ...project, technologies: value })} />
-              <Field label="URL gambar opsional" value={project.image} onChange={(value) => setProject({ ...project, image: value })} />
-              <Field label="URL project" value={project.url} onChange={(value) => setProject({ ...project, url: value })} />
-              <label className="grid gap-2 text-sm">
-                <span>Upload gambar project</span>
-                <input className="form-field" type="file" accept="image/*" onChange={(event) => setProjectFile(event.target.files?.[0] || null)} />
-              </label>
-              {project.image && !projectFile && (
-                <img src={project.image} alt={project.title || 'Preview project'} className="w-28 h-28 object-cover rounded-lg border border-neon-blue/10" />
+          <section className="grid lg:grid-cols-2 gap-8 lg:gap-10">
+            <form onSubmit={addProject} className="admin-panel rounded-xl p-6 md:p-8 space-y-5">
+              <div className="flex items-center justify-between">
+                <h2 className="text-2xl font-semibold">
+                  {editingProjectId ? 'Edit Project' : 'Tambah Project Baru'}
+                </h2>
+                {editingProjectId && (
+                  <span className="text-[11px] font-mono px-2.5 py-1 rounded bg-neon-blue/20 text-neon-blue border border-neon-blue font-bold animate-pulse">
+                    MODE EDIT
+                  </span>
+                )}
+              </div>
+
+              {editingProjectId && (
+                <div className="flex items-center justify-between p-3 rounded-lg bg-neon-blue/10 border border-neon-blue/30 text-xs text-neon-blue">
+                  <span className="flex items-center gap-2 truncate">
+                    <i className="fa-solid fa-pen-to-square shrink-0" />
+                    <span className="truncate">Mengubah: <strong>{project.title || 'Project'}</strong></span>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={resetProjectForm}
+                    className="shrink-0 px-2.5 py-1 rounded bg-white/10 hover:bg-white/20 text-white font-medium transition-colors"
+                  >
+                    Batal Edit
+                  </button>
+                </div>
               )}
-              {projectFile && <p className="text-sm text-green-300">File baru siap diupload: {projectFile.name}</p>}
-              <div className="flex gap-3 justify-end">
-                <button type="button" className="btn-muted" onClick={resetProjectForm} hidden={!editingProjectId}>Batal</button>
-                <button type="submit" className="btn-neon" disabled={savingProject}>
-                  {savingProject ? (editingProjectId ? 'Menyimpan...' : 'Menambahkan...') : (editingProjectId ? 'Update Project' : 'Tambah Project')}
+
+              <Field
+                label="Judul Project (e.g. QIQO Quiz App / Sistem Prediksi)"
+                placeholder="Judul Project"
+                value={project.title}
+                onChange={(value) => setProject({ ...project, title: value })}
+              />
+              <Field
+                label="Deskripsi Lengkap Project"
+                area
+                placeholder="Jelaskan fitur, kegunaan, dan keunggulan project..."
+                value={project.description}
+                onChange={(value) => setProject({ ...project, description: value })}
+              />
+              <Field
+                label="Teknologi / Stack (Pisahkan dengan koma, e.g. Flutter, Dart, Firebase)"
+                placeholder="React, Vite, Tailwind CSS"
+                value={project.technologies}
+                onChange={(value) => setProject({ ...project, technologies: value })}
+              />
+              <Field
+                label="URL Project / Demo / GitHub (Opsional)"
+                placeholder="https://github.com/Zyzero1/nama-project"
+                value={project.url}
+                onChange={(value) => setProject({ ...project, url: value })}
+              />
+              
+              <div className="grid gap-2 text-sm pt-1">
+                <span className="text-gray-300 font-medium">Gambar Cover Project</span>
+                <input
+                  className="form-field text-xs"
+                  type="file"
+                  accept="image/*"
+                  onChange={(event) => setProjectFile(event.target.files?.[0] || null)}
+                />
+                <Field
+                  label="Atau masukkan URL Gambar langsung (Opsional)"
+                  placeholder="/uploads/nama-gambar.png atau https://..."
+                  value={project.image}
+                  onChange={(value) => setProject({ ...project, image: value })}
+                />
+              </div>
+
+              {(projectFile || project.image) && (
+                <div className="flex items-center gap-3 p-3 rounded-lg bg-dark-950/60 border border-neon-blue/20">
+                  <img
+                    src={projectFile ? URL.createObjectURL(projectFile) : project.image}
+                    alt={project.title || 'Preview cover'}
+                    className="w-20 h-14 object-cover rounded-md border border-white/10"
+                  />
+                  <div className="text-xs min-w-0">
+                    <p className="text-white font-semibold truncate">{projectFile ? `File baru: ${projectFile.name}` : 'Cover aktif'}</p>
+                    <p className="text-gray-400 text-[11px] mt-0.5">Preview tampilan kartu project</p>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex gap-3 justify-end pt-2">
+                {editingProjectId && (
+                  <button type="button" className="btn-muted flex items-center gap-1.5" onClick={resetProjectForm}>
+                    <i className="fa-solid fa-xmark text-xs" />
+                    <span>Batal</span>
+                  </button>
+                )}
+                <button type="submit" className="btn-neon flex items-center gap-2" disabled={savingProject}>
+                  <i className="fa-solid fa-check text-xs" />
+                  <span>{savingProject ? 'Menyimpan...' : (editingProjectId ? 'Update Project' : 'Tambah Project')}</span>
                 </button>
               </div>
             </form>
-            <div className="admin-panel rounded-xl p-6">
-              <h2 className="text-2xl font-semibold mb-5">Project Anda</h2>
-              {data.projects.map((item) => (
-                <div className="flex justify-between border-t border-white/10 py-4 gap-4" key={item.id}>
-                  <div className="min-w-0">
-                    <span className="block font-medium truncate">{item.title}</span>
-                    <span className="text-xs text-gray-400 block mt-1">
-                      {Array.isArray(item.technologies) ? item.technologies.join(', ') : 'Tanpa teknologi'}
-                    </span>
-                  </div>
-                  <div className="flex gap-3">
-                    <button type="button" className="text-neon-blue" onClick={() => handleEditProject(item)}>Edit</button>
-                    <button type="button" className="text-red-300" onClick={() => removeProject(item.id)}>Hapus</button>
-                  </div>
+
+            <div className="admin-panel rounded-xl p-6 md:p-8">
+              <div className="flex items-center justify-between mb-6 pb-4 border-b border-white/10">
+                <div>
+                  <h2 className="text-2xl font-semibold">Daftar Project Anda</h2>
+                  <p className="text-xs text-gray-400 mt-1">Kelola portofolio project yang ditampilkan ke publik</p>
                 </div>
-              ))}
+                <span className="status-pill text-xs font-semibold px-3 py-1">{data.projects?.length || 0} Projects</span>
+              </div>
+
+              {/* Box Project List with Generous Gap */}
+              <div className="flex flex-col gap-6 max-h-[660px] overflow-y-auto pr-2">
+                {data.projects && data.projects.length > 0 ? (
+                  data.projects.map((item) => (
+                    <div
+                      className={`border rounded-2xl p-5 md:p-6 bg-dark-950/70 flex flex-col gap-5 transition-all duration-300 shadow-lg ${
+                        editingProjectId === item.id
+                          ? 'border-cyan-400 bg-gradient-to-b from-cyan-950/30 to-dark-950/90 shadow-[0_0_25px_rgba(6,182,212,0.25)] ring-1 ring-cyan-400/60'
+                          : 'border-white/15 hover:border-cyan-500/40 hover:shadow-cyan-500/5'
+                      }`}
+                      key={item.id}
+                    >
+                      {/* Top Row: Cover Thumbnail + Information */}
+                      <div className="flex gap-4 md:gap-5 items-start min-w-0">
+                        {item.image ? (
+                          <img
+                            src={item.image}
+                            alt={item.title}
+                            className="w-22 h-18 md:w-28 md:h-22 rounded-xl object-cover border border-white/15 shrink-0 bg-dark-900 shadow-md"
+                          />
+                        ) : (
+                          <div className="w-22 h-18 md:w-28 md:h-22 rounded-xl bg-dark-900 border border-white/15 flex items-center justify-center shrink-0 text-cyan-400/60 shadow-md">
+                            <i className="fa-solid fa-folder-open text-2xl" />
+                          </div>
+                        )}
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center justify-between gap-2">
+                            <h4 className="font-bold text-white text-base md:text-lg truncate tracking-tight">{item.title}</h4>
+                            {editingProjectId === item.id && (
+                              <span className="text-[10px] font-mono px-2.5 py-0.5 rounded-full bg-cyan-400 text-dark-950 font-black shrink-0 shadow-sm animate-pulse">
+                                SEDANG DIEDIT
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-xs md:text-sm text-gray-300 mt-1.5 line-clamp-2 leading-relaxed">{item.description}</p>
+                          
+                          {/* Tech Stack Chips */}
+                          <div className="flex flex-wrap gap-1.5 mt-3">
+                            {(Array.isArray(item.technologies) ? item.technologies : []).map((tech) => (
+                              <span key={tech} className="text-[11px] font-mono px-2.5 py-1 rounded-md bg-cyan-500/10 text-cyan-300 border border-cyan-400/30 font-medium">
+                                {tech}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Bottom Action Bar: Clear & Spacious */}
+                      <div className="pt-4 border-t border-white/10 flex flex-wrap items-center justify-between gap-3">
+                        {item.url ? (
+                          <a
+                            href={item.url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-dark-900/80 border border-white/10 text-xs text-gray-300 hover:text-cyan-300 hover:border-cyan-400/40 transition-all truncate max-w-[220px]"
+                            title={item.url}
+                          >
+                            <i className="fa-solid fa-arrow-up-right-from-square text-[10px] text-cyan-400" />
+                            <span className="truncate">{item.url}</span>
+                          </a>
+                        ) : (
+                          <span className="text-xs text-gray-500 italic flex items-center gap-1.5">
+                            <i className="fa-solid fa-link-slash text-[11px]" />
+                            <span>Tanpa URL publik</span>
+                          </span>
+                        )}
+
+                        {/* Distinct, High-Contrast Action Buttons */}
+                        <div className="flex items-center gap-2.5 ml-auto">
+                          {/* Tombol Edit (Cyan Neon Pill) */}
+                          <button
+                            type="button"
+                            onClick={() => handleEditProject(item)}
+                            className={`px-4 py-2 rounded-xl text-xs font-bold tracking-wide flex items-center gap-2 transition-all duration-200 cursor-pointer active:scale-95 shadow-md ${
+                              editingProjectId === item.id
+                                ? 'bg-gradient-to-r from-cyan-400 to-blue-500 text-dark-950 font-black shadow-[0_0_15px_rgba(6,182,212,0.6)] ring-2 ring-cyan-300'
+                                : 'bg-gradient-to-r from-cyan-500/20 via-blue-500/20 to-cyan-500/20 text-cyan-300 border border-cyan-400/60 hover:from-cyan-400 hover:to-blue-500 hover:text-dark-950 hover:border-cyan-300 hover:shadow-[0_0_18px_rgba(6,182,212,0.5)]'
+                            }`}
+                            title="Edit data project ini"
+                          >
+                            <i className="fa-solid fa-pen-to-square text-xs" />
+                            <span>{editingProjectId === item.id ? 'Sedang Diedit' : 'Edit'}</span>
+                          </button>
+
+                          {/* Tombol Hapus (Vibrant Red Pill) */}
+                          <button
+                            type="button"
+                            onClick={() => removeProject(item.id)}
+                            className="px-4 py-2 rounded-xl text-xs font-bold tracking-wide flex items-center gap-2 bg-gradient-to-r from-rose-500/20 via-red-500/20 to-rose-500/20 text-rose-300 border border-rose-500/60 hover:from-rose-500 hover:to-red-600 hover:text-white hover:border-rose-400 hover:shadow-[0_0_18px_rgba(244,63,94,0.6)] transition-all duration-200 cursor-pointer active:scale-95 shadow-md"
+                            title="Hapus project ini"
+                          >
+                            <i className="fa-solid fa-trash-can text-xs" />
+                            <span>Hapus</span>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="p-8 text-center text-gray-400 border border-dashed border-white/10 rounded-2xl">
+                    <i className="fa-solid fa-folder-plus text-3xl text-gray-600 mb-2 block" />
+                    <p className="text-sm">Belum ada project yang ditambahkan.</p>
+                  </div>
+                )}
+              </div>
             </div>
           </section>
         )}

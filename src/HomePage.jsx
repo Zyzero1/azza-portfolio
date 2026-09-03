@@ -195,22 +195,23 @@ export default function HomePage({ profile, projects, experiences = [], research
     { label: 'Tools', value: `${profile.tools.length}+` },
   ];
 
-  const projectList = (Array.isArray(projects) && projects.length >= 4)
+  const projectList = (Array.isArray(projects) && projects.length > 0)
     ? projects
-    : [
-        ...(Array.isArray(projects) ? projects : []),
-        ...fallbackProjects.filter((fb) => !projects?.some((p) => p.title.toLowerCase() === fb.title.toLowerCase())),
-      ];
+    : fallbackProjects;
 
   const homeProjects = projectList.slice(0, 3);
-  const moreProjects = projectList.slice(3, 6);
+  const moreProjects = projectList.slice(3);
 
   const renderProjectCard = (project, index) => {
-    const category = project.technologies?.includes('Flutter') || project.technologies?.includes('Dart')
+    const techs = Array.isArray(project.technologies)
+      ? project.technologies
+      : (typeof project.technologies === 'string' ? project.technologies.split(',').map(s => s.trim()).filter(Boolean) : []);
+
+    const category = techs.some(t => /flutter|dart|android|ios|mobile/i.test(t))
       ? 'MOBILE'
-      : project.technologies?.includes('React') || project.technologies?.includes('HTML') || project.technologies?.includes('HTML/CSS')
+      : techs.some(t => /react|vue|next|html|css|php|laravel|web|tailwind|bootstrap/i.test(t))
       ? 'WEB'
-      : project.technologies?.includes('Python') || project.technologies?.includes('C++')
+      : techs.some(t => /python|ai|ml|data|scikit|pandas|numpy|machine learning/i.test(t))
       ? 'AI/ML'
       : 'PROJECT';
 
@@ -226,8 +227,15 @@ export default function HomePage({ profile, projects, experiences = [], research
         {...hoverProps}
       >
         {/* Top Cover Image */}
-        <div className="project-img-wrapper">
-          <img src={project.image} alt={project.title} />
+        <div className="project-img-wrapper flex items-center justify-center bg-dark-950/80 overflow-hidden">
+          {project.image ? (
+            <img src={project.image} alt={project.title} className="w-full h-full object-cover" />
+          ) : (
+            <div className="w-full h-48 flex flex-col items-center justify-center text-gray-500 bg-gradient-to-br from-dark-900 to-dark-950">
+              <i className="fa-solid fa-folder-open text-4xl text-neon-blue/40 mb-2" />
+              <span className="text-[11px] font-mono text-neon-blue/80 font-semibold">{category} APPLICATION</span>
+            </div>
+          )}
         </div>
 
         {/* Card Content Area */}
@@ -238,11 +246,13 @@ export default function HomePage({ profile, projects, experiences = [], research
               <span className="project-cat-badge">
                 {category}
               </span>
-              <span className="project-link-icon p-0.5 ml-auto flex items-center justify-center">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.2" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                </svg>
-              </span>
+              {project.url && (
+                <span className="project-link-icon p-0.5 ml-auto flex items-center justify-center" title="Buka tautan project">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.2" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                  </svg>
+                </span>
+              )}
             </div>
 
             {/* Bold Project Title */}
@@ -257,13 +267,15 @@ export default function HomePage({ profile, projects, experiences = [], research
           </div>
 
           {/* Tech Stack Pills at the Bottom */}
-          <div className="flex flex-wrap gap-1.5 pt-1">
-            {project.technologies?.map((tech) => (
-              <span className="project-tech-chip text-[0.7rem] px-2 py-1" key={tech}>
-                {tech}
-              </span>
-            ))}
-          </div>
+          {techs.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 pt-1">
+              {techs.map((tech) => (
+                <span className="project-tech-chip text-[0.7rem] px-2 py-1" key={tech}>
+                  {tech}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
       </article>
     );
@@ -1145,18 +1157,20 @@ export default function HomePage({ profile, projects, experiences = [], research
               {homeProjects.map((project, index) => renderProjectCard(project, index))}
             </div>
 
-            {/* See More Projects Button */}
-            <div className="see-more-wrapper flex justify-center mt-14 md:mt-16 w-full">
-              <button
-                type="button"
-                onClick={() => setShowProjectsModal(true)}
-                className="see-more-projects-btn"
-                {...hoverProps}
-              >
-                <span>See More</span>
-                <i className="fa-solid fa-arrow-right text-xs" />
-              </button>
-            </div>
+            {/* See More Projects Button (Tampil dinamis jika ada project berikutnya) */}
+            {moreProjects.length > 0 && (
+              <div className="see-more-wrapper flex justify-center mt-14 md:mt-16 w-full">
+                <button
+                  type="button"
+                  onClick={() => setShowProjectsModal(true)}
+                  className="see-more-projects-btn"
+                  {...hoverProps}
+                >
+                  <span>See More Projects ({moreProjects.length})</span>
+                  <i className="fa-solid fa-arrow-right text-xs" />
+                </button>
+              </div>
+            )}
           </div>
         </section>
 
