@@ -175,6 +175,22 @@ function useData() {
               setSkillsData(parsedSkills);
               if (parsedSkills._researches && Array.isArray(parsedSkills._researches) && parsedSkills._researches.length > 0) {
                 setResearches(parsedSkills._researches);
+              } else {
+                // If cloud Supabase does not have _researches yet, auto-sync custom research from laptop localStorage
+                try {
+                  const localRes = JSON.parse(localStorage.getItem('portfolio_researches') || '[]');
+                  if (Array.isArray(localRes) && localRes.length > 0) {
+                    const isCustom = JSON.stringify(localRes) !== JSON.stringify(defaultResearches);
+                    if (isCustom) {
+                      const currentSkills = (p.skills && typeof p.skills === 'object' && !Array.isArray(p.skills)) ? p.skills : { ...parsedSkills };
+                      const updatedSkills = { ...currentSkills, _researches: localRes };
+                      supabase.from('profiles').update({
+                        skills: updatedSkills,
+                        updated_at: new Date().toISOString()
+                      }).not('id', 'is', null).catch((e) => console.warn('Auto-sync research failed:', e));
+                    }
+                  }
+                } catch {}
               }
             } catch (sErr) {
               console.warn('Failed to parse skills from profile:', sErr);
@@ -1803,9 +1819,36 @@ function Admin({ data }) {
             </form>
 
             <div className="admin-panel rounded-xl p-6">
-              <div className="flex items-center justify-between mb-5">
-                <h2 className="text-2xl font-semibold">Daftar Riset &amp; Publikasi</h2>
-                <span className="status-pill">{data.researches?.length || 0} Items</span>
+              <div className="flex items-center justify-between gap-3 mb-5 flex-wrap">
+                <div className="flex items-center gap-2.5">
+                  <h2 className="text-2xl font-semibold">Daftar Riset &amp; Publikasi</h2>
+                  <span className="status-pill">{data.researches?.length || 0} Items</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      setSavingResearch(true);
+                      const currentSkills = data.skillsData || {};
+                      const updatedSkills = { ...currentSkills, _researches: data.researches };
+                      await supabase.from('profiles').update({
+                        skills: updatedSkills,
+                        updated_at: new Date().toISOString()
+                      }).not('id', 'is', null);
+                      data.setSkillsData(updatedSkills);
+                      setNotice('Semua data riset berhasil disinkronkan ke Cloud Supabase!');
+                    } catch (e) {
+                      setNotice(`Gagal sinkron: ${e.message}`);
+                    } finally {
+                      setSavingResearch(false);
+                    }
+                  }}
+                  className="px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 bg-neon-purple/20 text-neon-purple border border-neon-purple/40 hover:bg-neon-purple hover:text-white transition-all cursor-pointer shadow-xs active:scale-95"
+                  title="Upload semua data riset yang ada di laptop ke Cloud Supabase agar tampil di HP & perangkat lain"
+                >
+                  <i className="fa-solid fa-cloud-arrow-up text-xs" />
+                  <span>Sync ke Cloud Supabase</span>
+                </button>
               </div>
               <div className="space-y-4 max-h-[580px] overflow-y-auto pr-1">
                 {data.researches && data.researches.length > 0 ? (
