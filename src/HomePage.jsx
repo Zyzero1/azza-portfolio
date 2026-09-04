@@ -105,6 +105,60 @@ const defaultEducations = [
   }
 ];
 
+const programmingMarkupList = [
+  { name: 'HTML5', icon: 'fa-brands fa-html5', color: '#E34F26' },
+  { name: 'CSS3', icon: 'fa-brands fa-css3-alt', color: '#1572B6' },
+  { name: 'JavaScript', icon: 'fa-brands fa-js', color: '#F7DF1E' },
+  { name: 'PHP', icon: 'fa-brands fa-php', color: '#777BB4' },
+  { name: 'Python', icon: 'fa-brands fa-python', color: '#3776AB' },
+  {
+    name: 'Dart',
+    color: '#0175C2',
+    customIcon: (
+      <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none">
+        <path d="M4.1 12.8L12.5 4.4H18.8L7.8 15.4Z" fill="#00D2B8"/>
+        <path d="M12.5 4.4L4.1 12.8L8.6 20.6H18.8Z" fill="#01579B"/>
+        <path d="M7.8 15.4L8.6 20.6H19.9L18.8 4.4Z" fill="#29B6F2"/>
+      </svg>
+    )
+  },
+  {
+    name: 'C++',
+    color: '#659AD2',
+    customIcon: <span className="w-4 h-4 text-[9px] font-black bg-[#00599c]/35 rounded flex items-center justify-center text-[#659ad2]">C++</span>
+  }
+];
+
+const frameworksDbList = [
+  {
+    name: 'Flutter',
+    color: '#54C5F8',
+    customIcon: (
+      <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none">
+        <path d="M14.3 2L4 12.3L7.2 15.5L20.7 2Z" fill="#42A5F5"/>
+        <path d="M14.3 12.3L9 17.6L12.2 20.8L20.7 12.3Z" fill="#0288D1"/>
+        <path d="M9 17.6L12.2 14.4L15.4 17.6L12.2 20.8Z" fill="#01579B"/>
+      </svg>
+    )
+  },
+  { name: 'React', icon: 'fa-brands fa-react', color: '#61DAFB' },
+  { name: 'Laravel', icon: 'fa-brands fa-laravel', color: '#FF2D20' },
+  { name: 'Bootstrap', icon: 'fa-brands fa-bootstrap', color: '#7952B3' },
+  { name: 'MySQL', icon: 'fa-solid fa-database', color: '#4479A1' },
+  { name: 'Firebase', icon: 'fa-solid fa-fire', color: '#FFA611' },
+  { name: 'Android SDK', icon: 'fa-brands fa-android', color: '#3DDC84' },
+  { name: 'Tailwind', icon: 'fa-solid fa-wind', color: '#38BDF8' }
+];
+
+const workflowToolsList = [
+  { name: 'Figma', sub: 'UI/UX Design', icon: 'fa-brands fa-figma', color: '#F24E1E' },
+  { name: 'VS Code', sub: 'Code Editor', icon: 'fa-solid fa-code', color: '#007ACC' },
+  { name: 'Git', sub: 'Version Control', icon: 'fa-brands fa-git-alt', color: '#F54D27' },
+  { name: 'GitHub', sub: 'Code Hosting', icon: 'fa-brands fa-github', color: '#6e5494' },
+  { name: 'Postman', sub: 'API Testing', icon: 'fa-solid fa-paper-plane', color: '#FF6C37' },
+  { name: 'MS Office', sub: 'Docs & Data', icon: 'fa-solid fa-file-lines', color: '#D83B01' }
+];
+
 export default function HomePage({ profile, projects, experiences = [], researches = [], educations = [], loading = false, error = '' }) {
   const [activeNav, setActiveNav] = useState('home');
   const [mobileMenu, setMobileMenu] = useState(false);
@@ -189,10 +243,14 @@ export default function HomePage({ profile, projects, experiences = [], research
     );
   }
 
+  const totalTechSkills = programmingMarkupList.length + frameworksDbList.length;
+  const totalTools = workflowToolsList.length;
+  const totalProjects = (Array.isArray(projects) && projects.length > 0) ? projects.length : fallbackProjects.length;
+
   const stats = [
-    { label: 'Projects', value: `${projects.length}+` },
-    { label: 'Tech Skills', value: `${profile.skills.length}+` },
-    { label: 'Tools', value: `${profile.tools.length}+` },
+    { label: 'Projects', value: `${totalProjects}+` },
+    { label: 'Tech Skills', value: `${totalTechSkills}+` },
+    { label: 'Tools', value: `${totalTools}+` },
   ];
 
   const projectList = (Array.isArray(projects) && projects.length > 0)
@@ -472,7 +530,7 @@ export default function HomePage({ profile, projects, experiences = [], research
             <SectionTitle
               eyebrow="Profile & Background"
               title="About Me"
-              description="Perjalanan profesional, rekam jejak akademik, dan riset teknologi yang saya kembangkan."
+              description="Professional journey, academic track record, and technological research I have developed."
             />
 
             {/* ── Side-by-Side Samping Kiri Kanan: 1 Baris 2 Kolom (Kiri Kurus 35% & Kanan Lebar 65%) ── */}
@@ -771,7 +829,7 @@ export default function HomePage({ profile, projects, experiences = [], research
             <SectionTitle eyebrow="Capabilities" title="Technical Proficiency" description="Tools and skills I use to turn ideas into useful digital products." />
 
             {/* ── 2 Atas 2 Bawah Grid Layout ── */}
-            <div className="skills-2x2-container flex flex-col gap-8">
+            <div className="skills-2x2-container flex flex-col gap-8 w-full max-w-[1040px] mx-auto">
 
               {/* ── TOP ROW: 2 Box (Pentagon Chart & Language Proficiency) ── */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -994,21 +1052,7 @@ export default function HomePage({ profile, projects, experiences = [], research
                       <span>Programming & Markup</span>
                     </p>
                     <div className="flex flex-wrap gap-2.5">
-                      {[
-                        { name: 'HTML5',      icon: 'fa-brands fa-html5',    color: '#E34F26' },
-                        { name: 'CSS3',       icon: 'fa-brands fa-css3-alt', color: '#1572B6' },
-                        { name: 'JavaScript', icon: 'fa-brands fa-js',       color: '#F7DF1E' },
-                        { name: 'PHP',        icon: 'fa-brands fa-php',      color: '#777BB4' },
-                        { name: 'Python',     icon: 'fa-brands fa-python',   color: '#3776AB' },
-                        { name: 'Dart', color: '#0175C2', customIcon: (
-                          <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none">
-                            <path d="M4.1 12.8L12.5 4.4H18.8L7.8 15.4Z" fill="#00D2B8"/>
-                            <path d="M12.5 4.4L4.1 12.8L8.6 20.6H18.8Z" fill="#01579B"/>
-                            <path d="M7.8 15.4L8.6 20.6H19.9L18.8 4.4Z" fill="#29B6F2"/>
-                          </svg>
-                        )},
-                        { name: 'C++', color: '#659AD2', customIcon: <span className="w-4 h-4 text-[9px] font-black bg-[#00599c]/35 rounded flex items-center justify-center text-[#659ad2]">C++</span> },
-                      ].map((t) => (
+                      {programmingMarkupList.map((t) => (
                         <div key={t.name} className="tech-badge" style={{ '--tech-color': t.color }}>
                           {t.customIcon ? t.customIcon : <i className={`${t.icon} text-base`} style={{ color: t.color }} />}
                           <span className="text-xs font-semibold">{t.name}</span>
@@ -1024,22 +1068,7 @@ export default function HomePage({ profile, projects, experiences = [], research
                       <span>Frameworks, Libraries & Database</span>
                     </p>
                     <div className="flex flex-wrap gap-2.5">
-                      {[
-                        { name: 'Flutter', color: '#54C5F8', customIcon: (
-                          <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none">
-                            <path d="M14.3 2L4 12.3L7.2 15.5L20.7 2Z" fill="#42A5F5"/>
-                            <path d="M14.3 12.3L9 17.6L12.2 20.8L20.7 12.3Z" fill="#0288D1"/>
-                            <path d="M9 17.6L12.2 14.4L15.4 17.6L12.2 20.8Z" fill="#01579B"/>
-                          </svg>
-                        )},
-                        { name: 'React',       icon: 'fa-brands fa-react',     color: '#61DAFB' },
-                        { name: 'Laravel',     icon: 'fa-brands fa-laravel',   color: '#FF2D20' },
-                        { name: 'Bootstrap',   icon: 'fa-brands fa-bootstrap', color: '#7952B3' },
-                        { name: 'MySQL',       icon: 'fa-solid fa-database',   color: '#4479A1' },
-                        { name: 'Firebase',    icon: 'fa-solid fa-fire',       color: '#FFA611' },
-                        { name: 'Android SDK', icon: 'fa-brands fa-android',   color: '#3DDC84' },
-                        { name: 'Tailwind',    icon: 'fa-solid fa-wind',       color: '#38BDF8' },
-                      ].map((t) => (
+                      {frameworksDbList.map((t) => (
                         <div key={t.name} className="tech-badge" style={{ '--tech-color': t.color }}>
                           {t.customIcon ? t.customIcon : <i className={`${t.icon} text-base`} style={{ color: t.color }} />}
                           <span className="text-xs font-semibold">{t.name}</span>
@@ -1074,14 +1103,7 @@ export default function HomePage({ profile, projects, experiences = [], research
 
                 {/* Grid 6 Tool Cards di Desktop (2 baris di mobile, 3 di tablet, 6 di desktop) */}
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3.5">
-                  {[
-                    { name: 'Figma',      sub: 'UI/UX Design',      icon: 'fa-brands fa-figma',      color: '#F24E1E' },
-                    { name: 'VS Code',    sub: 'Code Editor',       icon: 'fa-solid fa-code',         color: '#007ACC' },
-                    { name: 'Git',        sub: 'Version Control',   icon: 'fa-brands fa-git-alt',     color: '#F54D27' },
-                    { name: 'GitHub',     sub: 'Code Hosting',      icon: 'fa-brands fa-github',      color: '#6e5494' },
-                    { name: 'Postman',    sub: 'API Testing',       icon: 'fa-solid fa-paper-plane',  color: '#FF6C37' },
-                    { name: 'MS Office',  sub: 'Docs & Data',       icon: 'fa-solid fa-file-lines',   color: '#D83B01' },
-                  ].map((tool) => (
+                  {workflowToolsList.map((tool) => (
                     <div key={tool.name} className="tool-detail-card" style={{ '--tool-color': tool.color }}>
                       <div
                         className="tool-icon-box"
@@ -1151,7 +1173,7 @@ export default function HomePage({ profile, projects, experiences = [], research
 
         <section id="projects" className="homepage-section py-20 md:py-24 bg-dark-900/50 scroll-mt-20">
           <div className="site-container">
-            <SectionTitle eyebrow="Selected work" title="Featured Projects" description="Koleksi proyek pilihan yang pernah saya rancang dan kembangkan, menggabungkan fungsionalitas dan desain modern." />
+            <SectionTitle eyebrow="Selected work" title="Featured Projects" description="A curated collection of projects I have designed and developed, combining robust functionality with modern design." />
             
             <div className="flex flex-wrap justify-center gap-6 mx-auto">
               {homeProjects.map((project, index) => renderProjectCard(project, index))}
@@ -1177,7 +1199,7 @@ export default function HomePage({ profile, projects, experiences = [], research
 
         <section id="contact" className="homepage-section py-20 md:py-24 scroll-mt-20">
           <div className="site-container">
-            <SectionTitle eyebrow="Let's connect" title="Contact Me" description="Punya proyek menarik, kolaborasi, atau sekadar ingin berdiskusi? Jangan ragu untuk menghubungi saya!" />
+            <SectionTitle eyebrow="Let's connect" title="Contact Me" description="Have an exciting project, collaboration, or just want to connect? Don't hesitate to reach out!" />
 
             <div className="contact-cards-grid">
               {/* Card 1: Direct Email */}
@@ -1191,7 +1213,7 @@ export default function HomePage({ profile, projects, experiences = [], research
                   </span>
                   <h3 className="text-xl font-bold text-white mb-2">Let's Talk</h3>
                   <p className="text-gray-400 text-sm mb-6 leading-relaxed max-w-xs mx-auto">
-                    Kirim pesan langsung ke email saya untuk tawaran kerja sama atau proyek.
+                    Send a direct message to my email for project inquiries or collaboration.
                   </p>
                 </div>
                 <a
@@ -1231,7 +1253,7 @@ export default function HomePage({ profile, projects, experiences = [], research
                   </span>
                   <h3 className="text-xl font-bold text-white mb-2">Connect Online</h3>
                   <p className="text-gray-400 text-sm mb-6 leading-relaxed max-w-xs mx-auto">
-                    Temukan dan terhubung dengan profil saya di media sosial:
+                    Find and connect with my profile across social platforms:
                   </p>
                 </div>
                 <div className="flex items-center justify-center gap-3 w-full">
@@ -1358,7 +1380,7 @@ export default function HomePage({ profile, projects, experiences = [], research
           <div className="site-container modal-project-container max-w-7xl mx-auto w-full flex flex-col items-center">
             <SectionTitle
               title="Other Projects"
-              description="Koleksi proyek pilihan lainnya yang pernah saya rancang dan kembangkan, menggabungkan fungsionalitas dan desain modern."
+              description="Another curated collection of projects I have designed and developed, combining robust functionality with modern design."
             />
 
             <div className="flex flex-wrap justify-center gap-6 mx-auto w-full">

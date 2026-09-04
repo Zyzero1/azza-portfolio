@@ -1111,6 +1111,19 @@ footer > .site-container {
   }
 }
 
+/* ── Technical Proficiency (Skills) Container & 5 Boxes Width ── */
+.skills-2x2-container {
+  max-width: 1040px !important;
+  width: 100% !important;
+  margin-inline: auto !important;
+}
 
+.skills-2x2-container .tool-detail-card {
+  padding: 0.8rem 0.9rem !important;
+  gap: 0.75rem !important;
+}
 
-
+.skills-2x2-container .tool-icon-box {
+  width: 2.35rem !important;
+  height: 2.35rem !important;
+}

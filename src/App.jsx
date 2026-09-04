@@ -173,7 +173,7 @@ function useData() {
         }
 
         if (projectsResult.status === 'fulfilled' && projectsResult.value.data?.length) {
-          setProjects(projectsResult.value.data.map((item) => {
+          let loaded = projectsResult.value.data.map((item) => {
             let techs = [];
             if (Array.isArray(item.technologies)) {
               techs = item.technologies;
@@ -190,9 +190,32 @@ function useData() {
               technologies: techs,
               description: item.description || '',
               image: item.image || '',
-              url: item.url || ''
+              url: item.url || '',
+              sort_order: item.sort_order !== undefined ? item.sort_order : null
             };
-          }));
+          });
+
+          // Sort by sort_order if available, otherwise check localStorage order
+          const hasSortOrder = loaded.some((p) => p.sort_order !== null && p.sort_order !== undefined);
+          if (hasSortOrder) {
+            loaded.sort((a, b) => (a.sort_order ?? 9999) - (b.sort_order ?? 9999));
+          } else {
+            try {
+              const savedOrder = JSON.parse(localStorage.getItem('portfolio_projects_order') || '[]');
+              if (Array.isArray(savedOrder) && savedOrder.length > 0) {
+                loaded.sort((a, b) => {
+                  const idxA = savedOrder.indexOf(a.id);
+                  const idxB = savedOrder.indexOf(b.id);
+                  if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+                  if (idxA !== -1) return -1;
+                  if (idxB !== -1) return 1;
+                  return 0;
+                });
+              }
+            } catch {}
+          }
+
+          setProjects(loaded);
         }
 
         if (articlesResult.status === 'fulfilled' && articlesResult.value.data?.length) {
@@ -624,6 +647,35 @@ function Admin({ data }) {
     });
     setProjectFile(null);
     setTab('projects');
+  };
+
+  const reorderProject = async (fromIndex, toIndex) => {
+    if (toIndex < 0 || toIndex >= data.projects.length || fromIndex === toIndex) return;
+    const updated = [...data.projects];
+    const [movedItem] = updated.splice(fromIndex, 1);
+    updated.splice(toIndex, 0, movedItem);
+
+    data.setProjects(updated);
+    try {
+      localStorage.setItem('portfolio_projects_order', JSON.stringify(updated.map((p) => p.id)));
+    } catch {}
+
+    setNotice(`Project "${movedItem.title}" berhasil dipindahkan ke urutan #${toIndex + 1}.`);
+
+    if (supabase) {
+      try {
+        await Promise.all(
+          updated.map((p, idx) => {
+            if (typeof p.id === 'string' && p.id.includes('-')) {
+              return supabase.from('projects').update({ sort_order: idx }).eq('id', p.id);
+            }
+            return Promise.resolve();
+          })
+        );
+      } catch (err) {
+        console.warn('Supabase sort_order sync notice:', err.message);
+      }
+    }
   };
 
   const logout = async () => { await supabase.auth.signOut(); window.location.href = '/admin/login'; };
@@ -1196,7 +1248,7 @@ function Admin({ data }) {
               {/* Box Project List with Generous Gap */}
               <div className="flex flex-col gap-6 max-h-[660px] overflow-y-auto pr-2">
                 {data.projects && data.projects.length > 0 ? (
-                  data.projects.map((item) => (
+                  data.projects.map((item, index) => (
                     <div
                       className={`border rounded-2xl p-5 md:p-6 bg-dark-950/70 flex flex-col gap-5 transition-all duration-300 shadow-lg ${
                         editingProjectId === item.id
@@ -1205,6 +1257,70 @@ function Admin({ data }) {
                       }`}
                       key={item.id}
                     >
+                      {/* Top Bar inside Card: Order Position Badge & Reorder Controls */}
+                      <div className="flex flex-wrap items-center justify-between gap-2.5 pb-4 border-b border-white/10">
+                        {/* Position Badge */}
+                        <div className="flex items-center gap-2">
+                          <span
+                            className={`font-mono text-xs px-3 py-1.5 rounded-xl font-bold flex items-center gap-1.5 shadow-xs ${
+                              index < 3
+                                ? 'bg-amber-400/15 text-amber-300 border border-amber-400/40 shadow-[0_0_10px_rgba(251,191,36,0.15)]'
+                                : 'bg-white/10 text-gray-300 border border-white/15'
+                            }`}
+                          >
+                            <span>{index < 3 ? '⭐' : '📁'}</span>
+                            <span>Posisi #{index + 1}</span>
+                            <span className="text-[10px] font-medium opacity-80 pl-1 border-l border-white/20">
+                              {index < 3 ? 'Featured (Beranda)' : 'See More (Modal)'}
+                            </span>
+                          </span>
+                        </div>
+
+                        {/* Reorder Tools: Step Up/Down Buttons + Dropdown to Direct Jump */}
+                        <div className="flex items-center gap-2 ml-auto">
+                          {/* Step Up / Down Buttons */}
+                          <div className="flex items-center bg-dark-900 border border-white/15 rounded-xl p-1 gap-1 shadow-inner">
+                            <button
+                              type="button"
+                              disabled={index === 0}
+                              onClick={() => reorderProject(index, index - 1)}
+                              className="px-2.5 py-1 rounded-lg text-xs font-semibold text-gray-300 hover:text-cyan-300 hover:bg-white/10 disabled:opacity-30 disabled:pointer-events-none transition-all cursor-pointer flex items-center gap-1 active:scale-95"
+                              title="Geser naik ke posisi sebelumnya"
+                            >
+                              <i className="fa-solid fa-arrow-up text-[10px] text-cyan-400" />
+                              <span className="hidden sm:inline">Naik</span>
+                            </button>
+                            <button
+                              type="button"
+                              disabled={index === data.projects.length - 1}
+                              onClick={() => reorderProject(index, index + 1)}
+                              className="px-2.5 py-1 rounded-lg text-xs font-semibold text-gray-300 hover:text-cyan-300 hover:bg-white/10 disabled:opacity-30 disabled:pointer-events-none transition-all cursor-pointer flex items-center gap-1 active:scale-95"
+                              title="Geser turun ke posisi berikutnya"
+                            >
+                              <i className="fa-solid fa-arrow-down text-[10px] text-cyan-400" />
+                              <span className="hidden sm:inline">Turun</span>
+                            </button>
+                          </div>
+
+                          {/* Direct Position Selector */}
+                          <div className="flex items-center gap-1.5 bg-dark-900 border border-cyan-500/30 rounded-xl px-2.5 py-1">
+                            <label htmlFor={`pos-select-${item.id}`} className="text-[11px] text-gray-400">Pindah ke:</label>
+                            <select
+                              id={`pos-select-${item.id}`}
+                              value={index}
+                              onChange={(e) => reorderProject(index, parseInt(e.target.value, 10))}
+                              className="bg-transparent text-cyan-300 text-xs font-bold font-mono outline-none cursor-pointer hover:text-cyan-200"
+                              title="Pilih langsung urutan ke berapa"
+                            >
+                              {data.projects.map((_, pIdx) => (
+                                <option key={pIdx} value={pIdx} className="bg-dark-950 text-white font-sans">
+                                  Urutan #{pIdx + 1} {pIdx < 3 ? '⭐ (Beranda)' : '📁 (Modal)'}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
+                      </div>
                       {/* Top Row: Cover Thumbnail + Information */}
                       <div className="flex gap-4 md:gap-5 items-start min-w-0">
                         {item.image ? (
