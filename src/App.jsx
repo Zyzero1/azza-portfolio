@@ -88,7 +88,7 @@ const profileDefault = {
   availability: 'Available for Work',
   email: 'azza.alkausar@gmail.com',
   linkedin: 'https://www.linkedin.com/in/m-azza-alkausar/',
-  cvUrl: '/uploads/img_686a5952b576b.jpg',
+  cvUrl: '',
   location: 'Tanjung Balai Karimun, Indonesia',
   education: 'Informatics Engineering · UMRAH',
   experience: 'Class Representative Council Chair · SMAN 04 Karimun',
@@ -150,13 +150,20 @@ function useData() {
               if (Array.isArray(parsedEdu) && parsedEdu.length > 0) setEducations(parsedEdu);
             } catch {}
           }
+          const localStoredProfile = (() => {
+            try { return JSON.parse(localStorage.getItem('portfolio_profile') || '{}'); } catch { return {}; }
+          })();
+          const localSavedCv = typeof window !== 'undefined' ? (localStorage.getItem('portfolio_cv_url') || '') : '';
+          const candidateCv = p.cv_url || p.cvUrl || p.skills?._cvUrl || localSavedCv || (localStoredProfile.cvUrl && !localStoredProfile.cvUrl.includes('img_686a5952b576b') ? localStoredProfile.cvUrl : '') || '';
+          const safeCvUrl = candidateCv && !candidateCv.includes('img_686a5952b576b') ? candidateCv : '';
+
           setProfile({
             ...p,
             aboutBio: p.about_bio || p.aboutBio || defaultAboutBio,
             availability: p.availability || profileDefault.availability,
             email: p.email || profileDefault.email,
             linkedin: p.linkedin || profileDefault.linkedin,
-            cvUrl: p.cv_url || p.cvUrl || profileDefault.cvUrl,
+            cvUrl: safeCvUrl,
             softSkills: p.soft_skills || profileDefault.softSkills,
           });
           if (expFromProfile) {
@@ -679,6 +686,18 @@ function Admin({ data }) {
         profileImageUrl = await uploadPortfolioImage(profileFile, 'profile');
       }
 
+      const activeCv = cvUrl || data.profile.cvUrl || '';
+      const safeCvToSave = activeCv && !activeCv.includes('img_686a5952b576b') ? activeCv : '';
+      if (safeCvToSave) {
+        localStorage.setItem('portfolio_cv_url', safeCvToSave);
+      }
+
+      // Embed _cvUrl inside skills JSON so it persists across refreshes and cloud DB
+      const skillsPayload = {
+        ...(data.skillsData || {}),
+        ...(safeCvToSave ? { _cvUrl: safeCvToSave } : {})
+      };
+
       // Base columns that are guaranteed to exist in Supabase profiles table
       const basePayload = {
         name: data.profile.name,
@@ -690,7 +709,7 @@ function Admin({ data }) {
         experience: typeof data.profile.experience === 'string' && !data.profile.experience.startsWith('[')
           ? data.profile.experience
           : JSON.stringify(data.experiences),
-        skills: data.skillsData,
+        skills: skillsPayload,
         tools: data.skillsData?.workflowTools?.map((t) => t.name) || [],
         soft_skills: data.skillsData?.interpersonalSkills?.map((s) => s.name) || data.profile.softSkills,
         updated_at: new Date().toISOString()
@@ -704,7 +723,7 @@ function Admin({ data }) {
         ...(data.profile.availability ? { availability: data.profile.availability } : {}),
         ...(data.profile.email ? { email: data.profile.email } : {}),
         ...(data.profile.linkedin ? { linkedin: data.profile.linkedin } : {}),
-        ...(cvUrl ? { cv_url: cvUrl } : {})
+        ...(safeCvToSave ? { cv_url: safeCvToSave } : {})
       };
 
       let saved;
@@ -728,7 +747,7 @@ function Admin({ data }) {
         availability: data.profile.availability,
         email: data.profile.email,
         linkedin: data.profile.linkedin,
-        cvUrl: cvUrl || data.profile.cvUrl,
+        cvUrl: safeCvToSave,
         softSkills: saved?.soft_skills || basePayload.soft_skills
       });
       setNotice('Profile & Biography berhasil disimpan!');

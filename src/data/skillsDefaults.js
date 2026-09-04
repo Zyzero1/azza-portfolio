@@ -101,6 +101,7 @@ export function parseSkillsData(rawSkills, rawTools, rawSoftSkills) {
   // Case 1: If rawSkills is an object with full properties
   if (rawSkills && typeof rawSkills === 'object' && !Array.isArray(rawSkills)) {
     return {
+      _cvUrl: rawSkills._cvUrl || '',
       languages: Array.isArray(rawSkills.languages) && rawSkills.languages.length > 0
         ? rawSkills.languages
         : defaultSkillsData.languages,

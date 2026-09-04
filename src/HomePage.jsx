@@ -657,29 +657,43 @@ export default function HomePage({
 
                 {/* Actions: Download CV & LinkedIn (Diturunkan Sedikit dengan Spacing Lebih Lapang) */}
                 <div className="flex flex-col gap-2.5 pt-6 border-t border-neon-blue/15 mt-6">
-                  <a
-                    href={profile.cvUrl || profile.cv_url || '/uploads/img_686a5952b576b.jpg'}
-                    target="_blank"
-                    rel="noreferrer"
-                    download={profile.cvUrl || profile.cv_url ? true : `CV_${(profile.name || 'Muhammad_Azza_Al_Kausar').replace(/\s+/g, '_')}.pdf`}
-                    className="w-full py-3 px-4 rounded-xl font-bold text-xs md:text-sm flex items-center justify-center gap-2 transition-all hover:-translate-y-0.5 active:translate-y-0 cursor-pointer"
-                    style={{
-                      background: '#00f0ff',
-                      color: '#050b17',
-                      boxShadow: 'none'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.background = '#00d8e6';
-                      e.currentTarget.style.boxShadow = 'none';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.background = '#00f0ff';
-                      e.currentTarget.style.boxShadow = 'none';
-                    }}
-                  >
-                    <i className="fa-solid fa-file-arrow-down text-sm" style={{ color: '#050b17' }} />
-                    <span style={{ color: '#050b17' }}>Download CV (PDF)</span>
-                  </a>
+                  {(() => {
+                    const rawCv = profile?.cvUrl || profile?.cv_url || '';
+                    const localCv = typeof window !== 'undefined' ? (localStorage.getItem('portfolio_cv_url') || '') : '';
+                    const candidate = rawCv || localCv;
+                    const validCv = candidate && !candidate.includes('img_686a5952b576b') ? candidate : '';
+                    return (
+                      <a
+                        href={validCv || '#'}
+                        target={validCv ? "_blank" : undefined}
+                        rel={validCv ? "noreferrer" : undefined}
+                        download={validCv ? `CV_${(profile?.name || 'Muhammad_Azza_Al_Kausar').replace(/\s+/g, '_')}.pdf` : undefined}
+                        onClick={(e) => {
+                          if (!validCv) {
+                            e.preventDefault();
+                            alert('File CV belum diunggah. Silakan unggah file CV Anda di Admin Dashboard (/admin).');
+                          }
+                        }}
+                        className="w-full py-3 px-4 rounded-xl font-bold text-xs md:text-sm flex items-center justify-center gap-2 transition-all hover:-translate-y-0.5 active:translate-y-0 cursor-pointer"
+                        style={{
+                          background: '#00f0ff',
+                          color: '#050b17',
+                          boxShadow: 'none'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.background = '#00d8e6';
+                          e.currentTarget.style.boxShadow = 'none';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.background = '#00f0ff';
+                          e.currentTarget.style.boxShadow = 'none';
+                        }}
+                      >
+                        <i className="fa-solid fa-file-arrow-down text-sm" style={{ color: '#050b17' }} />
+                        <span style={{ color: '#050b17' }}>Download CV (PDF)</span>
+                      </a>
+                    );
+                  })()}
 
                   <a
                     href={profile.linkedin || 'https://www.linkedin.com/in/m-azza-alkausar/'}
