@@ -3,6 +3,7 @@ import { Link, Navigate, Route, Routes, useNavigate } from 'react-router-dom';
 import HomePage from './HomePage';
 import { isSupabaseConfigured, supabase } from './lib/supabase';
 import { uploadPortfolioFile, uploadPortfolioImage } from './lib/storage';
+import { defaultSkillsData, lookupTechMeta, parseSkillsData } from './data/skillsDefaults';
 
 const defaultAboutBio = 'Informatics Engineering student at Raja Ali Haji Maritime University (UMRAH) specializing in modern software engineering, high-performance web development, and mobile applications. Experienced in architecting end-to-end digital solutions—from responsive user interfaces to integrated backends and maritime AI/Machine Learning data analytics. Dedicated to delivering functional, clean, and user-centric digital experiences.';
 
@@ -114,6 +115,7 @@ function useData() {
   const [experiences, setExperiences] = useStored('portfolio_experiences', experiencesDefault);
   const [researches, setResearches] = useStored('portfolio_researches', defaultResearches);
   const [educations, setEducations] = useStored('portfolio_educations', defaultEducations);
+  const [skillsData, setSkillsData] = useStored('portfolio_skills_data', defaultSkillsData);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -160,6 +162,14 @@ function useData() {
           });
           if (expFromProfile) {
             setExperiences(expFromProfile);
+          }
+          if (p.skills || p.tools || p.soft_skills) {
+            try {
+              const parsedSkills = parseSkillsData(p.skills, p.tools, p.soft_skills);
+              setSkillsData(parsedSkills);
+            } catch (sErr) {
+              console.warn('Failed to parse skills from profile:', sErr);
+            }
           }
         }
 
@@ -236,9 +246,9 @@ function useData() {
     return () => {
       active = false;
     };
-  }, [setProfile, setProjects, setArticles, setExperiences, setEducations]);
+  }, [setProfile, setProjects, setArticles, setExperiences, setEducations, setSkillsData]);
 
-  return { profile, setProfile, projects, setProjects, articles, setArticles, experiences, setExperiences, researches, setResearches, educations, setEducations, loading, error };
+  return { profile, setProfile, projects, setProjects, articles, setArticles, experiences, setExperiences, researches, setResearches, educations, setEducations, skillsData, setSkillsData, loading, error };
 }
 function Login() { const [error, setError] = useState(''); const [loading, setLoading] = useState(false); const navigate = useNavigate(); const submit = async (event) => { event.preventDefault(); if (!isSupabaseConfigured) return setError('Supabase belum terkonfigurasi.'); const form = new FormData(event.currentTarget); setLoading(true); const { error: authError } = await supabase.auth.signInWithPassword({ email: String(form.get('email')), password: String(form.get('password')) }); setLoading(false); if (authError) return setError(authError.message); navigate('/admin'); }; return <div className="min-h-screen flex items-center justify-center px-4"><form onSubmit={submit} className="kartu-transparan rounded-xl p-8 w-full max-w-md"><Link to="/" className="text-neon-blue">← Kembali</Link><h1 className="text-3xl font-bold mt-8 mb-8">Admin Portfolio</h1><div className="space-y-4"><input name="email" type="email" required className="form-field" placeholder="Email admin" /><input name="password" type="password" required className="form-field" placeholder="Password" /><button disabled={loading} className="btn-neon w-full">{loading ? 'Memeriksa...' : 'Masuk'}</button>{error && <p className="text-red-300">{error}</p>}</div></form></div>; }
 function Field({ label, value, onChange, area = false, type = 'text', placeholder = '' }) { const Tag = area ? 'textarea' : 'input'; return <label className="grid gap-2 text-sm"><span className="text-gray-300">{label}</span><Tag className="form-field" placeholder={placeholder} rows={area ? 5 : undefined} type={area ? undefined : type} value={value ?? ''} onChange={(event) => onChange(event.target.value)} /></label>; }
@@ -264,6 +274,196 @@ function Admin({ data }) {
 
   const [savingProfile, setSavingProfile] = useState(false);
   const [savingProject, setSavingProject] = useState(false);
+  const [savingSkills, setSavingSkills] = useState(false);
+
+  const saveSkillsData = async () => {
+    try {
+      setSavingSkills(true);
+      data.setSkillsData({ ...data.skillsData });
+
+      if (isSupabaseConfigured) {
+        const payload = {
+          skills: data.skillsData,
+          tools: data.skillsData.workflowTools?.map((t) => t.name) || [],
+          soft_skills: data.skillsData.interpersonalSkills?.map((s) => s.name) || [],
+          updated_at: new Date().toISOString()
+        };
+
+        const { error } = await supabase
+          .from('profiles')
+          .update(payload)
+          .not('id', 'is', null);
+
+        if (error) throw error;
+      }
+
+      setNotice('Technical Proficiency berhasil disimpan ke Supabase!');
+    } catch (err) {
+      console.error('Error saving skills:', err);
+      setNotice(`Gagal menyimpan skills: ${err.message}`);
+    } finally {
+      setSavingSkills(false);
+    }
+  };
+
+  const updateLanguage = (index, field, value) => {
+    const list = [...(data.skillsData?.languages || defaultSkillsData.languages)];
+    list[index] = { ...list[index], [field]: value };
+    data.setSkillsData({ ...data.skillsData, languages: list });
+  };
+
+  const addLanguage = () => {
+    const list = data.skillsData?.languages || defaultSkillsData.languages;
+    const newLang = {
+      name: 'New Language',
+      level: 75,
+      color: '#00f0ff',
+      icon: 'fa-solid fa-code'
+    };
+    data.setSkillsData({
+      ...data.skillsData,
+      languages: [...list, newLang]
+    });
+  };
+
+  const removeLanguage = (index) => {
+    const list = data.skillsData?.languages || defaultSkillsData.languages;
+    if (list.length <= 3) {
+      alert('Minimal dibutuhkan 3 bahasa untuk visualisasi radar chart.');
+      return;
+    }
+    const updated = list.filter((_, i) => i !== index);
+    data.setSkillsData({ ...data.skillsData, languages: updated });
+  };
+
+  const updateProgrammingMarkup = (index, field, value) => {
+    const list = [...(data.skillsData?.programmingMarkup || defaultSkillsData.programmingMarkup)];
+    list[index] = { ...list[index], [field]: value };
+    data.setSkillsData({ ...data.skillsData, programmingMarkup: list });
+  };
+
+  const addProgrammingMarkup = (e) => {
+    e.preventDefault();
+    const form = e.currentTarget;
+    const name = form.techName.value.trim();
+    const customIcon = form.techIcon?.value.trim();
+    const color = form.techColor.value;
+    if (!name) return;
+    const meta = lookupTechMeta(name, color);
+    const item = {
+      name,
+      color: color || meta.color,
+      icon: customIcon || meta.icon || 'fa-solid fa-code',
+      isDart: meta.isDart,
+      isCpp: meta.isCpp
+    };
+    data.setSkillsData({
+      ...data.skillsData,
+      programmingMarkup: [...(data.skillsData?.programmingMarkup || defaultSkillsData.programmingMarkup), item]
+    });
+    form.reset();
+  };
+
+  const removeProgrammingMarkup = (index) => {
+    const list = data.skillsData?.programmingMarkup || defaultSkillsData.programmingMarkup;
+    const updated = list.filter((_, i) => i !== index);
+    data.setSkillsData({ ...data.skillsData, programmingMarkup: updated });
+  };
+
+  const updateFrameworkDb = (index, field, value) => {
+    const list = [...(data.skillsData?.frameworksDb || defaultSkillsData.frameworksDb)];
+    list[index] = { ...list[index], [field]: value };
+    data.setSkillsData({ ...data.skillsData, frameworksDb: list });
+  };
+
+  const addFrameworkDb = (e) => {
+    e.preventDefault();
+    const form = e.currentTarget;
+    const name = form.fwName.value.trim();
+    const customIcon = form.fwIcon?.value.trim();
+    const color = form.fwColor.value;
+    if (!name) return;
+    const meta = lookupTechMeta(name, color);
+    const item = {
+      name,
+      color: color || meta.color,
+      icon: customIcon || meta.icon || 'fa-solid fa-layer-group',
+      isFlutter: meta.isFlutter
+    };
+    data.setSkillsData({
+      ...data.skillsData,
+      frameworksDb: [...(data.skillsData?.frameworksDb || defaultSkillsData.frameworksDb), item]
+    });
+    form.reset();
+  };
+
+  const removeFrameworkDb = (index) => {
+    const list = data.skillsData?.frameworksDb || defaultSkillsData.frameworksDb;
+    const updated = list.filter((_, i) => i !== index);
+    data.setSkillsData({ ...data.skillsData, frameworksDb: updated });
+  };
+
+  const updateWorkflowTool = (index, field, value) => {
+    const list = [...(data.skillsData?.workflowTools || defaultSkillsData.workflowTools)];
+    list[index] = { ...list[index], [field]: value };
+    data.setSkillsData({ ...data.skillsData, workflowTools: list });
+  };
+
+  const addWorkflowTool = (e) => {
+    e.preventDefault();
+    const form = e.currentTarget;
+    const name = form.toolName.value.trim();
+    const sub = form.toolSub.value.trim() || 'Daily Tool';
+    const customIcon = form.toolIcon?.value.trim();
+    const color = form.toolColor.value;
+    if (!name) return;
+    const meta = lookupTechMeta(name, color);
+    const item = {
+      name,
+      sub,
+      color: color || meta.color,
+      icon: customIcon || meta.icon || 'fa-solid fa-toolbox'
+    };
+    data.setSkillsData({
+      ...data.skillsData,
+      workflowTools: [...(data.skillsData?.workflowTools || defaultSkillsData.workflowTools), item]
+    });
+    form.reset();
+  };
+
+  const removeWorkflowTool = (index) => {
+    const list = data.skillsData?.workflowTools || defaultSkillsData.workflowTools;
+    const updated = list.filter((_, i) => i !== index);
+    data.setSkillsData({ ...data.skillsData, workflowTools: updated });
+  };
+
+  const updateInterpersonalSkill = (index, field, value) => {
+    const list = [...(data.skillsData?.interpersonalSkills || defaultSkillsData.interpersonalSkills)];
+    list[index] = { ...list[index], [field]: value };
+    data.setSkillsData({ ...data.skillsData, interpersonalSkills: list });
+  };
+
+  const addInterpersonalSkill = (e) => {
+    e.preventDefault();
+    const form = e.currentTarget;
+    const name = form.softName.value.trim();
+    const sub = form.softSub.value.trim() || 'Key Strength';
+    const customIcon = form.softIcon?.value.trim() || 'fa-solid fa-bolt';
+    const color = form.softColor.value;
+    if (!name) return;
+    const item = { name, sub, color, icon: customIcon };
+    data.setSkillsData({
+      ...data.skillsData,
+      interpersonalSkills: [...(data.skillsData?.interpersonalSkills || defaultSkillsData.interpersonalSkills), item]
+    });
+    form.reset();
+  };
+
+  const removeInterpersonalSkill = (index) => {
+    const list = data.skillsData?.interpersonalSkills || defaultSkillsData.interpersonalSkills;
+    const updated = list.filter((_, i) => i !== index);
+    data.setSkillsData({ ...data.skillsData, interpersonalSkills: updated });
+  };
 
   const resetProjectForm = () => {
     setProject({ title: '', description: '', technologies: '', image: '', url: '' });
@@ -513,7 +713,9 @@ function Admin({ data }) {
         experience: typeof data.profile.experience === 'string' && !data.profile.experience.startsWith('[')
           ? data.profile.experience
           : JSON.stringify(data.experiences),
-        soft_skills: data.profile.softSkills,
+        skills: data.skillsData,
+        tools: data.skillsData?.workflowTools?.map((t) => t.name) || [],
+        soft_skills: data.skillsData?.interpersonalSkills?.map((s) => s.name) || data.profile.softSkills,
         updated_at: new Date().toISOString()
       };
       if (profileImageUrl) basePayload.image = profileImageUrl;
@@ -696,18 +898,19 @@ function Admin({ data }) {
           <p className="text-gray-400 mt-2">Kelola profil, biography, experiences, project, dan artikel secara dinamis terhubung Supabase.</p>
         </div>
         <div className="flex flex-wrap gap-2 mb-8">
-          {['overview', 'profile', 'experiences', 'research', 'education', 'projects', 'articles'].map((item) => (
+          {['overview', 'profile', 'skills', 'experiences', 'research', 'education', 'projects', 'articles'].map((item) => (
             <button type="button" className={tab === item ? 'btn-neon' : 'btn-muted'} onClick={() => setTab(item)} key={item}>
-              {item === 'experiences' ? 'Experiences' : item === 'research' ? 'Research' : item === 'education' ? 'Education' : item}
+              {item === 'skills' ? 'Skills & Tech' : item === 'experiences' ? 'Experiences' : item === 'research' ? 'Research' : item === 'education' ? 'Education' : item}
             </button>
           ))}
         </div>
         {notice && <div className="toast" onClick={() => setNotice('')}>{notice}</div>}
         
         {tab === 'overview' && (
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
             {[
               ['Profile & Bio', 'profile', 'Ready'],
+              ['Skills & Tech', 'skills', `${data.skillsData?.languages?.length || 5} Langs`],
               ['Experiences', 'experiences', data.experiences?.length || 0],
               ['Research', 'research', data.researches?.length || 0],
               ['Education', 'education', data.educations?.length || 0],
@@ -719,7 +922,7 @@ function Admin({ data }) {
                   <p className="text-gray-400 text-xs">{title}</p>
                   <span className="status-pill text-[10px]">{val}</span>
                 </div>
-                <p className="text-2xl font-bold mt-4">{val}</p>
+                <p className="text-xl font-bold mt-4 truncate">{val}</p>
                 <button type="button" className="text-neon-blue text-xs mt-4 inline-flex items-center hover:underline" onClick={() => setTab(target)}>
                   Kelola <span className="ml-1">→</span>
                 </button>
@@ -821,6 +1024,595 @@ function Admin({ data }) {
 
               <button className="btn-neon px-6 py-3" disabled={savingProfile} onClick={saveProfile}>
                 {savingProfile ? 'Menyimpan ke Supabase...' : 'Simpan Profile & Biography'}
+              </button>
+            </div>
+          </section>
+        )}
+
+        {tab === 'skills' && (
+          <section className="space-y-8 animate-fadeIn">
+            {/* Top action bar */}
+            <div className="admin-panel rounded-xl p-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div>
+                <h2 className="text-2xl font-bold text-white flex items-center gap-2.5">
+                  <i className="fa-solid fa-code text-neon-blue text-xl" />
+                  <span>Kelola Technical Proficiency</span>
+                </h2>
+                <p className="text-xs text-gray-400 mt-1">
+                  Atur Radar Chart, Core Stack Languages, Stack Badges, Daily Tools, dan Interpersonal Skills tersinkron ke Supabase.
+                </p>
+              </div>
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (window.confirm('Kembalikan semua technical proficiency ke nilai default awal?')) {
+                      data.setSkillsData(defaultSkillsData);
+                    }
+                  }}
+                  className="btn-muted text-xs px-3 py-2"
+                >
+                  Reset Default
+                </button>
+                <button
+                  type="button"
+                  disabled={savingSkills}
+                  onClick={saveSkillsData}
+                  className="btn-neon px-5 py-2.5 text-xs font-bold flex items-center gap-2"
+                >
+                  <i className="fa-solid fa-cloud-arrow-up text-xs" />
+                  <span>{savingSkills ? 'Menyimpan...' : 'Simpan Technical Proficiency'}</span>
+                </button>
+              </div>
+            </div>
+
+            {/* 1. Core Languages (Radar Chart & Proficiency Bars) */}
+            <div className="admin-panel rounded-xl p-6 space-y-5">
+              <div className="flex items-center justify-between border-b border-white/10 pb-4">
+                <div>
+                  <h3 className="text-base font-bold text-neon-blue flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-neon-blue shadow-[0_0_8px_#00f0ff]" />
+                    <span>1. Core Languages (Radar Chart &amp; Language Proficiency)</span>
+                  </h3>
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    Bahasa utama yang ditampilkan di Pentagon Radar Chart dan Core Stack Progress Bar.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={addLanguage}
+                  className="btn-neon text-xs px-3 py-1.5 flex items-center gap-1.5"
+                >
+                  <i className="fa-solid fa-plus text-[10px]" />
+                  <span>Tambah Bahasa</span>
+                </button>
+              </div>
+
+              <div className="grid gap-3.5">
+                {(data.skillsData?.languages || defaultSkillsData.languages).map((lang, idx) => (
+                  <div key={idx} className="p-4 rounded-xl bg-dark-950/60 border border-white/5 flex flex-col md:flex-row items-start md:items-center gap-4">
+                    {/* Color picker & Name */}
+                    <div className="flex items-center gap-3 w-full md:w-auto">
+                      <input
+                        type="color"
+                        value={lang.color || '#00f0ff'}
+                        onChange={(e) => updateLanguage(idx, 'color', e.target.value)}
+                        className="w-9 h-9 rounded-lg cursor-pointer bg-transparent border-0 p-0 shrink-0"
+                        title="Pilih warna neon/brand"
+                      />
+                      <input
+                        type="text"
+                        value={lang.name}
+                        placeholder="Nama Bahasa"
+                        onChange={(e) => updateLanguage(idx, 'name', e.target.value)}
+                        className="form-field flex-1 md:w-44 text-sm font-semibold"
+                      />
+                    </div>
+
+                    {/* Level slider & percentage */}
+                    <div className="flex items-center gap-3 flex-1 w-full">
+                      <input
+                        type="range"
+                        min="10"
+                        max="100"
+                        value={lang.level}
+                        onChange={(e) => updateLanguage(idx, 'level', Number(e.target.value))}
+                        className="w-full accent-cyan-400 cursor-pointer"
+                      />
+                      <span
+                        className="font-mono text-xs font-bold px-2.5 py-1 rounded w-16 text-center shrink-0"
+                        style={{
+                          color: lang.color || '#00f0ff',
+                          background: `${lang.color || '#00f0ff'}15`,
+                          border: `1px solid ${lang.color || '#00f0ff'}40`
+                        }}
+                      >
+                        {lang.level}%
+                      </span>
+                    </div>
+
+                    {/* Icon class input with live preview */}
+                    <div className="flex items-center gap-2 w-full md:w-56">
+                      <div
+                        className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 border"
+                        style={{
+                          background: `${lang.color || '#00f0ff'}18`,
+                          borderColor: `${lang.color || '#00f0ff'}50`,
+                          color: lang.color || '#00f0ff'
+                        }}
+                        title="Live Icon Preview"
+                      >
+                        <i className={`${lang.icon || 'fa-solid fa-code'} text-xs`} />
+                      </div>
+                      <input
+                        type="text"
+                        value={lang.icon || ''}
+                        placeholder="Icon FontAwesome class"
+                        onChange={(e) => updateLanguage(idx, 'icon', e.target.value)}
+                        className="form-field text-xs font-mono flex-1"
+                        title="Contoh: fa-brands fa-js atau fa-solid fa-code"
+                      />
+                    </div>
+
+                    {/* Delete button */}
+                    <button
+                      type="button"
+                      onClick={() => removeLanguage(idx)}
+                      disabled={(data.skillsData?.languages || defaultSkillsData.languages).length <= 3}
+                      className="p-2 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                      title={(data.skillsData?.languages || defaultSkillsData.languages).length <= 3 ? 'Minimal butuh 3 bahasa untuk radar chart' : 'Hapus bahasa'}
+                    >
+                      <i className="fa-solid fa-trash-can text-sm" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* 2. Technologies & Frameworks */}
+            <div className="admin-panel rounded-xl p-6 space-y-6">
+              <div className="border-b border-white/10 pb-4">
+                <h3 className="text-base font-bold text-neon-blue flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-neon-blue shadow-[0_0_8px_#00f0ff]" />
+                  <span>2. Technologies &amp; Frameworks</span>
+                </h3>
+                <p className="text-xs text-gray-400 mt-0.5">
+                  Daftar stack badge yang ditampilkan pada Box Technologies &amp; Frameworks. Semua kolom dapat diedit langsung (warna, nama, &amp; icon).
+                </p>
+              </div>
+
+              {/* Subgroup 1: Programming & Markup */}
+              <div className="p-5 rounded-xl bg-dark-950/40 border border-white/5 space-y-4">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-bold uppercase tracking-wider text-neon-blue">A. Programming &amp; Markup</p>
+                  <span className="text-xs font-mono text-gray-400">{(data.skillsData?.programmingMarkup || defaultSkillsData.programmingMarkup).length} items</span>
+                </div>
+
+                {/* Editable Items List */}
+                <div className="grid gap-2.5">
+                  {(data.skillsData?.programmingMarkup || defaultSkillsData.programmingMarkup).map((item, idx) => (
+                    <div
+                      key={idx}
+                      className="p-3 rounded-xl bg-dark-950/70 border border-white/10 flex flex-wrap items-center gap-3 transition-colors hover:border-white/20"
+                    >
+                      {/* Live Icon & Color preview */}
+                      <div
+                        className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 border"
+                        style={{
+                          background: `${item.color || '#00f0ff'}18`,
+                          borderColor: `${item.color || '#00f0ff'}50`,
+                          color: item.color || '#00f0ff'
+                        }}
+                        title="Live Icon Preview"
+                      >
+                        <i className={`${item.icon || 'fa-solid fa-code'} text-xs`} />
+                      </div>
+
+                      {/* Color picker */}
+                      <input
+                        type="color"
+                        value={item.color || '#00f0ff'}
+                        onChange={(e) => updateProgrammingMarkup(idx, 'color', e.target.value)}
+                        className="w-8 h-8 rounded-lg cursor-pointer bg-transparent border-0 p-0 shrink-0"
+                        title="Pilih warna neon/brand"
+                      />
+
+                      {/* Name input */}
+                      <input
+                        type="text"
+                        value={item.name}
+                        placeholder="Nama Stack"
+                        onChange={(e) => updateProgrammingMarkup(idx, 'name', e.target.value)}
+                        className="form-field text-xs font-semibold flex-1 min-w-[120px]"
+                      />
+
+                      {/* Icon class input */}
+                      <input
+                        type="text"
+                        value={item.icon || ''}
+                        placeholder="Icon class (e.g. fa-brands fa-html5)"
+                        onChange={(e) => updateProgrammingMarkup(idx, 'icon', e.target.value)}
+                        className="form-field text-xs font-mono flex-1 min-w-[150px]"
+                        title="Class FontAwesome (e.g. fa-brands fa-html5, fa-brands fa-python)"
+                      />
+
+                      {/* Delete button */}
+                      <button
+                        type="button"
+                        onClick={() => removeProgrammingMarkup(idx)}
+                        className="p-2 text-gray-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors shrink-0"
+                        title="Hapus stack ini"
+                      >
+                        <i className="fa-solid fa-trash-can text-xs" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Form quick add */}
+                <form onSubmit={addProgrammingMarkup} className="p-3.5 rounded-xl bg-dark-950/50 border border-white/10 flex flex-wrap gap-2.5 items-center">
+                  <input
+                    type="text"
+                    name="techName"
+                    placeholder="Nama Stack baru (e.g. TypeScript)"
+                    required
+                    className="form-field text-xs flex-1 min-w-[130px]"
+                  />
+                  <input
+                    type="text"
+                    name="techIcon"
+                    placeholder="Icon class (e.g. fa-brands fa-js)"
+                    className="form-field text-xs font-mono flex-1 min-w-[150px]"
+                    title="Opsional: masukkan icon fontawesome, jika kosong otomatis dideteksi"
+                  />
+                  <input
+                    type="color"
+                    name="techColor"
+                    defaultValue="#00f0ff"
+                    className="w-8 h-8 rounded-lg cursor-pointer bg-transparent border-0 p-0 self-center shrink-0"
+                    title="Pilih warna"
+                  />
+                  <button type="submit" className="btn-neon text-xs px-3.5 py-2 shrink-0">
+                    + Tambah Programming &amp; Markup
+                  </button>
+                </form>
+              </div>
+
+              {/* Subgroup 2: Frameworks, Libraries & Database */}
+              <div className="p-5 rounded-xl bg-dark-950/40 border border-white/5 space-y-4">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-bold uppercase tracking-wider text-neon-purple">B. Frameworks, Libraries &amp; Database</p>
+                  <span className="text-xs font-mono text-gray-400">{(data.skillsData?.frameworksDb || defaultSkillsData.frameworksDb).length} items</span>
+                </div>
+
+                {/* Editable Items List */}
+                <div className="grid gap-2.5">
+                  {(data.skillsData?.frameworksDb || defaultSkillsData.frameworksDb).map((item, idx) => (
+                    <div
+                      key={idx}
+                      className="p-3 rounded-xl bg-dark-950/70 border border-white/10 flex flex-wrap items-center gap-3 transition-colors hover:border-white/20"
+                    >
+                      {/* Live Icon & Color preview */}
+                      <div
+                        className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 border"
+                        style={{
+                          background: `${item.color || '#a78bfa'}18`,
+                          borderColor: `${item.color || '#a78bfa'}50`,
+                          color: item.color || '#a78bfa'
+                        }}
+                        title="Live Icon Preview"
+                      >
+                        <i className={`${item.icon || 'fa-solid fa-layer-group'} text-xs`} />
+                      </div>
+
+                      {/* Color picker */}
+                      <input
+                        type="color"
+                        value={item.color || '#a78bfa'}
+                        onChange={(e) => updateFrameworkDb(idx, 'color', e.target.value)}
+                        className="w-8 h-8 rounded-lg cursor-pointer bg-transparent border-0 p-0 shrink-0"
+                        title="Pilih warna brand"
+                      />
+
+                      {/* Name input */}
+                      <input
+                        type="text"
+                        value={item.name}
+                        placeholder="Nama Framework / DB"
+                        onChange={(e) => updateFrameworkDb(idx, 'name', e.target.value)}
+                        className="form-field text-xs font-semibold flex-1 min-w-[120px]"
+                      />
+
+                      {/* Icon class input */}
+                      <input
+                        type="text"
+                        value={item.icon || ''}
+                        placeholder="Icon class (e.g. fa-brands fa-react)"
+                        onChange={(e) => updateFrameworkDb(idx, 'icon', e.target.value)}
+                        className="form-field text-xs font-mono flex-1 min-w-[150px]"
+                        title="Class FontAwesome (e.g. fa-brands fa-react, fa-solid fa-database)"
+                      />
+
+                      {/* Delete button */}
+                      <button
+                        type="button"
+                        onClick={() => removeFrameworkDb(idx)}
+                        className="p-2 text-gray-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors shrink-0"
+                        title="Hapus framework ini"
+                      >
+                        <i className="fa-solid fa-trash-can text-xs" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Form quick add */}
+                <form onSubmit={addFrameworkDb} className="p-3.5 rounded-xl bg-dark-950/50 border border-white/10 flex flex-wrap gap-2.5 items-center">
+                  <input
+                    type="text"
+                    name="fwName"
+                    placeholder="Nama Framework/DB (e.g. Next.js / PostgreSQL)"
+                    required
+                    className="form-field text-xs flex-1 min-w-[130px]"
+                  />
+                  <input
+                    type="text"
+                    name="fwIcon"
+                    placeholder="Icon class (e.g. fa-brands fa-react)"
+                    className="form-field text-xs font-mono flex-1 min-w-[150px]"
+                    title="Opsional: masukkan icon fontawesome, jika kosong otomatis dideteksi"
+                  />
+                  <input
+                    type="color"
+                    name="fwColor"
+                    defaultValue="#a78bfa"
+                    className="w-8 h-8 rounded-lg cursor-pointer bg-transparent border-0 p-0 self-center shrink-0"
+                    title="Pilih warna"
+                  />
+                  <button type="submit" className="btn-neon text-xs px-3.5 py-2 shrink-0">
+                    + Tambah Framework &amp; DB
+                  </button>
+                </form>
+              </div>
+            </div>
+
+            {/* 3. Tools & Workflow (Daily Stack) */}
+            <div className="admin-panel rounded-xl p-6 space-y-5">
+              <div className="border-b border-white/10 pb-4">
+                <h3 className="text-base font-bold text-neon-pink flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-neon-pink shadow-[0_0_8px_#f472b6]" />
+                  <span>3. Tools &amp; Workflow (Daily Stack)</span>
+                </h3>
+                <p className="text-xs text-gray-400 mt-0.5">
+                  Tool harian pendukung produktivitas dan alur kerja pengembangan software. Semua kolom dapat diedit langsung.
+                </p>
+              </div>
+
+              {/* Editable Tools Grid */}
+              <div className="grid md:grid-cols-2 gap-3.5">
+                {(data.skillsData?.workflowTools || defaultSkillsData.workflowTools).map((tool, idx) => (
+                  <div key={idx} className="p-4 rounded-xl bg-dark-950/70 border border-white/10 flex flex-col gap-3 transition-colors hover:border-white/20">
+                    {/* Top Row: Preview, Color, Name, Delete */}
+                    <div className="flex items-center gap-3">
+                      <div
+                        className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 border"
+                        style={{
+                          background: `${tool.color || '#f472b6'}20`,
+                          borderColor: `${tool.color || '#f472b6'}50`,
+                          color: tool.color || '#f472b6'
+                        }}
+                        title="Live Icon Preview"
+                      >
+                        <i className={`${tool.icon || 'fa-solid fa-toolbox'} text-sm`} />
+                      </div>
+                      <input
+                        type="color"
+                        value={tool.color || '#f472b6'}
+                        onChange={(e) => updateWorkflowTool(idx, 'color', e.target.value)}
+                        className="w-7 h-7 rounded-lg cursor-pointer bg-transparent border-0 p-0 shrink-0"
+                        title="Pilih warna tool"
+                      />
+                      <input
+                        type="text"
+                        value={tool.name}
+                        placeholder="Nama Tool (e.g. Figma)"
+                        onChange={(e) => updateWorkflowTool(idx, 'name', e.target.value)}
+                        className="form-field text-xs font-bold flex-1"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => removeWorkflowTool(idx)}
+                        className="p-1.5 text-gray-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors shrink-0"
+                        title="Hapus tool"
+                      >
+                        <i className="fa-solid fa-trash-can text-xs" />
+                      </button>
+                    </div>
+
+                    {/* Bottom Row: Sub/Role & Icon Class */}
+                    <div className="grid sm:grid-cols-2 gap-2">
+                      <input
+                        type="text"
+                        value={tool.sub || ''}
+                        placeholder="Kategori / Peran (e.g. UI/UX Design)"
+                        onChange={(e) => updateWorkflowTool(idx, 'sub', e.target.value)}
+                        className="form-field text-xs text-gray-300"
+                      />
+                      <input
+                        type="text"
+                        value={tool.icon || ''}
+                        placeholder="Icon class (e.g. fa-brands fa-figma)"
+                        onChange={(e) => updateWorkflowTool(idx, 'icon', e.target.value)}
+                        className="form-field text-xs font-mono text-gray-300"
+                        title="Class FontAwesome (e.g. fa-brands fa-figma, fa-brands fa-docker)"
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Form Tambah Tool Baru */}
+              <form onSubmit={addWorkflowTool} className="p-4 rounded-xl bg-dark-950/50 border border-white/10 flex flex-wrap gap-3 items-center">
+                <input
+                  type="text"
+                  name="toolName"
+                  placeholder="Nama Tool (e.g. Docker)"
+                  required
+                  className="form-field text-xs flex-1 min-w-[120px]"
+                />
+                <input
+                  type="text"
+                  name="toolSub"
+                  placeholder="Kategori / Peran (e.g. Containerization)"
+                  required
+                  className="form-field text-xs flex-1 min-w-[140px]"
+                />
+                <input
+                  type="text"
+                  name="toolIcon"
+                  placeholder="Icon class (e.g. fa-brands fa-docker)"
+                  className="form-field text-xs font-mono flex-1 min-w-[150px]"
+                  title="Class FontAwesome icon"
+                />
+                <input
+                  type="color"
+                  name="toolColor"
+                  defaultValue="#f472b6"
+                  className="w-8 h-8 rounded-lg cursor-pointer bg-transparent border-0 p-0 shrink-0"
+                  title="Pilih warna"
+                />
+                <button type="submit" className="btn-neon text-xs px-4 py-2 shrink-0">
+                  + Tambah Tool
+                </button>
+              </form>
+            </div>
+
+            {/* 4. Interpersonal Skills (Key Strengths) */}
+            <div className="admin-panel rounded-xl p-6 space-y-5">
+              <div className="border-b border-white/10 pb-4">
+                <h3 className="text-base font-bold text-emerald-400 flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_8px_#34d399]" />
+                  <span>4. Interpersonal Skills (Key Strengths)</span>
+                </h3>
+                <p className="text-xs text-gray-400 mt-0.5">
+                  Keahlian non-teknis, karakter kolaborasi, dan daya adaptasi profesional. Semua kolom dapat diedit langsung termasuk icon (e.g. fa-solid fa-bolt).
+                </p>
+              </div>
+
+              {/* Editable Interpersonal Skills Grid */}
+              <div className="grid md:grid-cols-2 gap-3.5">
+                {(data.skillsData?.interpersonalSkills || defaultSkillsData.interpersonalSkills).map((skill, idx) => (
+                  <div key={idx} className="p-4 rounded-xl bg-dark-950/70 border border-white/10 flex flex-col gap-3 transition-colors hover:border-white/20">
+                    {/* Top Row: Preview, Color, Name, Delete */}
+                    <div className="flex items-center gap-3">
+                      <div
+                        className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 border"
+                        style={{
+                          background: `${skill.color || '#34d399'}20`,
+                          borderColor: `${skill.color || '#34d399'}50`,
+                          color: skill.color || '#34d399'
+                        }}
+                        title="Live Icon Preview"
+                      >
+                        <i className={`${skill.icon || 'fa-solid fa-bolt'} text-sm`} />
+                      </div>
+                      <input
+                        type="color"
+                        value={skill.color || '#34d399'}
+                        onChange={(e) => updateInterpersonalSkill(idx, 'color', e.target.value)}
+                        className="w-7 h-7 rounded-lg cursor-pointer bg-transparent border-0 p-0 shrink-0"
+                        title="Pilih warna soft skill"
+                      />
+                      <input
+                        type="text"
+                        value={skill.name}
+                        placeholder="Nama Skill (e.g. Adaptive & Agile)"
+                        onChange={(e) => updateInterpersonalSkill(idx, 'name', e.target.value)}
+                        className="form-field text-xs font-bold flex-1"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => removeInterpersonalSkill(idx)}
+                        className="p-1.5 text-gray-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors shrink-0"
+                        title="Hapus soft skill"
+                      >
+                        <i className="fa-solid fa-trash-can text-xs" />
+                      </button>
+                    </div>
+
+                    {/* Bottom Row: Sub/Description & Icon class (e.g. fa-solid fa-bolt) */}
+                    <div className="grid sm:grid-cols-2 gap-2">
+                      <input
+                        type="text"
+                        value={skill.sub || ''}
+                        placeholder="Deskripsi Singkat (e.g. Quick Continuous Learner)"
+                        onChange={(e) => updateInterpersonalSkill(idx, 'sub', e.target.value)}
+                        className="form-field text-xs text-gray-300"
+                      />
+                      <input
+                        type="text"
+                        value={skill.icon || ''}
+                        placeholder="Icon class (e.g. fa-solid fa-bolt)"
+                        onChange={(e) => updateInterpersonalSkill(idx, 'icon', e.target.value)}
+                        className="form-field text-xs font-mono text-gray-300"
+                        title="Class FontAwesome icon (e.g. fa-solid fa-bolt, fa-solid fa-lightbulb)"
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Form Tambah Interpersonal Skill */}
+              <form onSubmit={addInterpersonalSkill} className="p-4 rounded-xl bg-dark-950/50 border border-white/10 flex flex-wrap gap-3 items-center">
+                <input
+                  type="text"
+                  name="softName"
+                  placeholder="Keahlian (e.g. Adaptive & Agile)"
+                  required
+                  className="form-field text-xs flex-1 min-w-[130px]"
+                />
+                <input
+                  type="text"
+                  name="softSub"
+                  placeholder="Deskripsi Singkat (e.g. Quick Continuous Learner)"
+                  required
+                  className="form-field text-xs flex-1 min-w-[150px]"
+                />
+                <input
+                  type="text"
+                  name="softIcon"
+                  defaultValue="fa-solid fa-bolt"
+                  placeholder="Icon class (e.g. fa-solid fa-bolt)"
+                  required
+                  className="form-field text-xs font-mono flex-1 min-w-[140px]"
+                  title="Masukkan class FontAwesome seperti fa-solid fa-bolt"
+                />
+                <input
+                  type="color"
+                  name="softColor"
+                  defaultValue="#34d399"
+                  className="w-8 h-8 rounded-lg cursor-pointer bg-transparent border-0 p-0 shrink-0"
+                  title="Pilih warna"
+                />
+                <button type="submit" className="btn-neon text-xs px-4 py-2 shrink-0">
+                  + Tambah Soft Skill
+                </button>
+              </form>
+            </div>
+
+            {/* Bottom Save bar */}
+            <div className="admin-panel rounded-xl p-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+              <span className="text-xs text-gray-400">
+                Pastikan menekan tombol simpan agar seluruh modifikasi tersinkronisasi ke database Supabase dan live website.
+              </span>
+              <button
+                type="button"
+                disabled={savingSkills}
+                onClick={saveSkillsData}
+                className="btn-neon px-6 py-3 text-sm font-bold flex items-center gap-2"
+              >
+                <i className="fa-solid fa-cloud-arrow-up text-sm" />
+                <span>{savingSkills ? 'Menyimpan...' : 'Simpan Technical Proficiency'}</span>
               </button>
             </div>
           </section>
@@ -1429,5 +2221,5 @@ function Admin({ data }) {
   );
 }
 function AdminGate({ data }) { const [session, setSession] = useState(null); const [loading, setLoading] = useState(true); useEffect(() => { let active = true; if (!supabase) return setLoading(false); supabase.auth.getSession().then(({ data: result }) => { if (active) { setSession(result.session); setLoading(false); } }); const { data: listener } = supabase.auth.onAuthStateChange((_event, nextSession) => setSession(nextSession)); return () => { active = false; listener.subscription.unsubscribe(); }; }, []); if (loading) return <div className="min-h-screen flex items-center justify-center text-gray-400">Memeriksa sesi...</div>; return session ? <Admin data={data} /> : <Navigate to="/admin/login" replace />; }
-function App() { const data = useData(); return <Routes><Route path="/" element={<HomePage profile={data.profile} projects={data.projects} articles={data.articles} experiences={data.experiences} researches={data.researches} educations={data.educations} loading={data.loading} error={data.error} />} /><Route path="/admin/login" element={<Login />} /><Route path="/admin" element={<AdminGate data={data} />} /><Route path="*" element={<Navigate to="/" replace />} /></Routes>; }
+function App() { const data = useData(); return <Routes><Route path="/" element={<HomePage profile={data.profile} projects={data.projects} articles={data.articles} experiences={data.experiences} researches={data.researches} educations={data.educations} skillsData={data.skillsData} loading={data.loading} error={data.error} />} /><Route path="/admin/login" element={<Login />} /><Route path="/admin" element={<AdminGate data={data} />} /><Route path="*" element={<Navigate to="/" replace />} /></Routes>; }
 export default App;

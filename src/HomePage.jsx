@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { defaultSkillsData } from './data/skillsDefaults';
 
 const scrollSections = [
   { id: 'home', label: 'Home' },
@@ -105,61 +106,71 @@ const defaultEducations = [
   }
 ];
 
-const programmingMarkupList = [
-  { name: 'HTML5', icon: 'fa-brands fa-html5', color: '#E34F26' },
-  { name: 'CSS3', icon: 'fa-brands fa-css3-alt', color: '#1572B6' },
-  { name: 'JavaScript', icon: 'fa-brands fa-js', color: '#F7DF1E' },
-  { name: 'PHP', icon: 'fa-brands fa-php', color: '#777BB4' },
-  { name: 'Python', icon: 'fa-brands fa-python', color: '#3776AB' },
-  {
-    name: 'Dart',
-    color: '#0175C2',
-    customIcon: (
+function renderTechIcon(item, extraClass = '') {
+  if (item?.customIcon) return item.customIcon;
+  const nameLower = String(item?.name || '').trim().toLowerCase();
+  if ((item?.isDart || nameLower === 'dart') && (!item?.icon || item?.icon === 'fa-solid fa-mobile-screen')) {
+    return (
       <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none">
         <path d="M4.1 12.8L12.5 4.4H18.8L7.8 15.4Z" fill="#00D2B8"/>
         <path d="M12.5 4.4L4.1 12.8L8.6 20.6H18.8Z" fill="#01579B"/>
         <path d="M7.8 15.4L8.6 20.6H19.9L18.8 4.4Z" fill="#29B6F2"/>
       </svg>
-    )
-  },
-  {
-    name: 'C++',
-    color: '#659AD2',
-    customIcon: <span className="w-4 h-4 text-[9px] font-black bg-[#00599c]/35 rounded flex items-center justify-center text-[#659ad2]">C++</span>
+    );
   }
-];
-
-const frameworksDbList = [
-  {
-    name: 'Flutter',
-    color: '#54C5F8',
-    customIcon: (
+  if ((item?.isFlutter || nameLower === 'flutter') && (!item?.icon || item?.icon === 'fa-solid fa-mobile-screen')) {
+    return (
       <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none">
         <path d="M14.3 2L4 12.3L7.2 15.5L20.7 2Z" fill="#42A5F5"/>
         <path d="M14.3 12.3L9 17.6L12.2 20.8L20.7 12.3Z" fill="#0288D1"/>
         <path d="M9 17.6L12.2 14.4L15.4 17.6L12.2 20.8Z" fill="#01579B"/>
       </svg>
-    )
-  },
-  { name: 'React', icon: 'fa-brands fa-react', color: '#61DAFB' },
-  { name: 'Laravel', icon: 'fa-brands fa-laravel', color: '#FF2D20' },
-  { name: 'Bootstrap', icon: 'fa-brands fa-bootstrap', color: '#7952B3' },
-  { name: 'MySQL', icon: 'fa-solid fa-database', color: '#4479A1' },
-  { name: 'Firebase', icon: 'fa-solid fa-fire', color: '#FFA611' },
-  { name: 'Android SDK', icon: 'fa-brands fa-android', color: '#3DDC84' },
-  { name: 'Tailwind', icon: 'fa-solid fa-wind', color: '#38BDF8' }
-];
+    );
+  }
+  if ((item?.isCpp || nameLower === 'c++' || nameLower === 'cpp') && (!item?.icon || item?.icon === 'fa-solid fa-code')) {
+    return (
+      <span className="w-4 h-4 text-[9px] font-black bg-[#00599c]/35 rounded flex items-center justify-center text-[#659ad2]">
+        C++
+      </span>
+    );
+  }
+  if ((item?.isC || nameLower === 'c') && (!item?.icon || item?.icon === 'fa-solid fa-code' || item?.icon === 'fa-solid fa-c')) {
+    return (
+      <span className="w-4 h-4 text-[10px] font-black bg-[#00599c]/35 rounded flex items-center justify-center text-[#A8B9CC]">
+        C
+      </span>
+    );
+  }
+  const iconClass = item?.icon || 'fa-solid fa-code';
+  return <i className={`${iconClass} ${extraClass}`} style={{ color: item?.color || '#00f0ff' }} />;
+}
 
-const workflowToolsList = [
-  { name: 'Figma', sub: 'UI/UX Design', icon: 'fa-brands fa-figma', color: '#F24E1E' },
-  { name: 'VS Code', sub: 'Code Editor', icon: 'fa-solid fa-code', color: '#007ACC' },
-  { name: 'Git', sub: 'Version Control', icon: 'fa-brands fa-git-alt', color: '#F54D27' },
-  { name: 'GitHub', sub: 'Code Hosting', icon: 'fa-brands fa-github', color: '#6e5494' },
-  { name: 'Postman', sub: 'API Testing', icon: 'fa-solid fa-paper-plane', color: '#FF6C37' },
-  { name: 'MS Office', sub: 'Docs & Data', icon: 'fa-solid fa-file-lines', color: '#D83B01' }
-];
-
-export default function HomePage({ profile, projects, experiences = [], researches = [], educations = [], loading = false, error = '' }) {
+export default function HomePage({
+  profile,
+  projects,
+  experiences = [],
+  researches = [],
+  educations = [],
+  skillsData = null,
+  loading = false,
+  error = ''
+}) {
+  const currentSkills = skillsData || defaultSkillsData;
+  const currentLanguages = (currentSkills.languages && currentSkills.languages.length > 0)
+    ? currentSkills.languages
+    : defaultSkillsData.languages;
+  const currentProgrammingMarkup = (currentSkills.programmingMarkup && currentSkills.programmingMarkup.length > 0)
+    ? currentSkills.programmingMarkup
+    : defaultSkillsData.programmingMarkup;
+  const currentFrameworksDb = (currentSkills.frameworksDb && currentSkills.frameworksDb.length > 0)
+    ? currentSkills.frameworksDb
+    : defaultSkillsData.frameworksDb;
+  const currentWorkflowTools = (currentSkills.workflowTools && currentSkills.workflowTools.length > 0)
+    ? currentSkills.workflowTools
+    : defaultSkillsData.workflowTools;
+  const currentInterpersonalSkills = (currentSkills.interpersonalSkills && currentSkills.interpersonalSkills.length > 0)
+    ? currentSkills.interpersonalSkills
+    : defaultSkillsData.interpersonalSkills;
   const [activeNav, setActiveNav] = useState('home');
   const [mobileMenu, setMobileMenu] = useState(false);
   const [cursor, setCursor] = useState({ x: -100, y: -100 });
@@ -262,8 +273,8 @@ export default function HomePage({ profile, projects, experiences = [], research
     );
   }
 
-  const totalTechSkills = programmingMarkupList.length + frameworksDbList.length;
-  const totalTools = workflowToolsList.length;
+  const totalTechSkills = currentProgrammingMarkup.length + currentFrameworksDb.length;
+  const totalTools = currentWorkflowTools.length;
   const totalProjects = (Array.isArray(projects) && projects.length > 0) ? projects.length : fallbackProjects.length;
 
   const stats = [
@@ -934,8 +945,8 @@ export default function HomePage({ profile, projects, experiences = [], research
                         <polygon
                           key={i}
                           className="radar-grid-ring"
-                          points={[0,1,2,3,4].map(j => {
-                            const angle = (Math.PI * 2 * j) / 5 - Math.PI / 2;
+                          points={[...Array(currentLanguages.length).keys()].map(j => {
+                            const angle = (Math.PI * 2 * j) / currentLanguages.length - Math.PI / 2;
                             return `${150 + 105 * r * Math.cos(angle)},${150 + 105 * r * Math.sin(angle)}`;
                           }).join(' ')}
                           fill="none" stroke="rgba(0,240,255,0.18)" strokeWidth="1"
@@ -943,81 +954,111 @@ export default function HomePage({ profile, projects, experiences = [], research
                         />
                       ))}
                       {/* Spokes with subtle neon cyan color */}
-                      {[0,1,2,3,4].map(j => {
-                        const angle = (Math.PI * 2 * j) / 5 - Math.PI / 2;
-                        return <line key={j} x1="150" y1="150" x2={150 + 105 * Math.cos(angle)} y2={150 + 105 * Math.sin(angle)} stroke="rgba(0,240,255,0.22)" strokeWidth="1" strokeDasharray="3 3" />;
+                      {[...Array(currentLanguages.length).keys()].map(j => {
+                        const angle = (Math.PI * 2 * j) / currentLanguages.length - Math.PI / 2;
+                        return (
+                          <line
+                            key={j}
+                            x1="150"
+                            y1="150"
+                            x2={150 + 105 * Math.cos(angle)}
+                            y2={150 + 105 * Math.sin(angle)}
+                            stroke="rgba(0,240,255,0.22)"
+                            strokeWidth="1"
+                            strokeDasharray="3 3"
+                          />
+                        );
                       })}
-                      {/* Data polygon matching language percentages: HTML/CSS (90%), JS (80%), PHP (80%), Python (67%), Dart (60%) */}
+                      {/* Data polygon matching dynamic languages */}
                       {(() => {
-                        const langData = [
-                          { name: 'HTML / CSS', pct: 0.90, color: '#E34F26' },
-                          { name: 'JavaScript', pct: 0.80, color: '#F7DF1E' },
-                          { name: 'PHP',        pct: 0.80, color: '#777BB4' },
-                          { name: 'Python',     pct: 0.67, color: '#3776AB' },
-                          { name: 'Dart',       pct: 0.60, color: '#0175C2' },
-                        ];
-                        const pts = langData.map((item, j) => {
-                          const angle = (Math.PI * 2 * j) / 5 - Math.PI / 2;
-                          return `${150 + 105 * item.pct * Math.cos(angle)},${150 + 105 * item.pct * Math.sin(angle)}`;
+                        const numPoints = currentLanguages.length;
+                        const pts = currentLanguages.map((item, j) => {
+                          const angle = (Math.PI * 2 * j) / numPoints - Math.PI / 2;
+                          const pct = Math.min(Math.max((Number(item.level) || 0) / 100, 0.1), 1.0);
+                          return `${150 + 105 * pct * Math.cos(angle)},${150 + 105 * pct * Math.sin(angle)}`;
                         }).join(' ');
                         return (
                           <>
                             <polygon points={pts} fill="rgba(0,240,255,0.12)" stroke="#00f0ff" strokeWidth="2" className="radar-polygon" />
-                            {langData.map((item, j) => {
-                              const angle = (Math.PI * 2 * j) / 5 - Math.PI / 2;
+                            {currentLanguages.map((item, j) => {
+                              const angle = (Math.PI * 2 * j) / numPoints - Math.PI / 2;
+                              const pct = Math.min(Math.max((Number(item.level) || 0) / 100, 0.1), 1.0);
+                              const itemColor = item.color || '#00f0ff';
                               return (
                                 <circle
                                   key={j}
-                                  cx={150 + 105 * item.pct * Math.cos(angle)}
-                                  cy={150 + 105 * item.pct * Math.sin(angle)}
+                                  cx={150 + 105 * pct * Math.cos(angle)}
+                                  cy={150 + 105 * pct * Math.sin(angle)}
                                   r="5.5"
-                                  fill={item.color}
+                                  fill={itemColor}
                                   className="radar-dot"
-                                  style={{ '--dot-delay': `${1.3 + j * 0.12}s`, filter: `drop-shadow(0 0 7px ${item.color})` }}
+                                  style={{ '--dot-delay': `${1.3 + j * 0.12}s`, filter: `drop-shadow(0 0 7px ${itemColor})` }}
                                 />
                               );
                             })}
                           </>
                         );
                       })()}
-                      {/* Axis labels with matching custom brand colors (no plain white) */}
-                      {[
-                        { label: 'HTML / CSS', x: 150, y: 24,  anchor: 'middle', col: '#E34F26', pct: '90%' },
-                        { label: 'JavaScript', x: 272, y: 114, anchor: 'start',  col: '#F7DF1E', pct: '80%' },
-                        { label: 'PHP',        x: 236, y: 260, anchor: 'start',  col: '#777BB4', pct: '80%' },
-                        { label: 'Python',     x: 64,  y: 260, anchor: 'end',    col: '#3776AB', pct: '67%' },
-                        { label: 'Dart',       x: 28,  y: 114, anchor: 'end',    col: '#0175C2', pct: '60%' },
-                      ].map((item, i) => (
-                        <text key={i} x={item.x} y={item.y} textAnchor={item.anchor} dominantBaseline="middle"
-                          fill={item.col} fontSize="11" fontFamily="Outfit, sans-serif" fontWeight="700"
-                          style={{ filter: `drop-shadow(0 0 8px ${item.col}55)` }}>
-                          {item.label}
-                        </text>
-                      ))}
+                      {/* Axis labels with matching custom brand colors */}
+                      {currentLanguages.map((item, i) => {
+                        const numPoints = currentLanguages.length;
+                        let x, y, anchor;
+                        if (numPoints === 5) {
+                          const tailored = [
+                            { x: 150, y: 24,  anchor: 'middle' },
+                            { x: 272, y: 114, anchor: 'start' },
+                            { x: 236, y: 260, anchor: 'start' },
+                            { x: 64,  y: 260, anchor: 'end' },
+                            { x: 28,  y: 114, anchor: 'end' },
+                          ];
+                          x = tailored[i].x;
+                          y = tailored[i].y;
+                          anchor = tailored[i].anchor;
+                        } else {
+                          const angle = (Math.PI * 2 * i) / numPoints - Math.PI / 2;
+                          const dist = 126;
+                          const cos = Math.cos(angle);
+                          const sin = Math.sin(angle);
+                          x = 150 + dist * cos;
+                          y = 150 + dist * sin;
+                          anchor = cos > 0.25 ? 'start' : cos < -0.25 ? 'end' : 'middle';
+                        }
+                        const itemColor = item.color || '#00f0ff';
+                        return (
+                          <text
+                            key={i}
+                            x={x}
+                            y={y}
+                            textAnchor={anchor}
+                            dominantBaseline="middle"
+                            fill={itemColor}
+                            fontSize="11"
+                            fontFamily="Outfit, sans-serif"
+                            fontWeight="700"
+                            style={{ filter: `drop-shadow(0 0 8px ${itemColor}55)` }}
+                          >
+                            {item.name}
+                          </text>
+                        );
+                      })}
                     </svg>
                     <div className="radar-center-glow" />
                   </div>
 
-                  {/* Synchronized Language Badges (Border line sesuai warna indikatornya, sudut tumpul proporsional) */}
+                  {/* Synchronized Language Badges */}
                   <div className="w-full flex flex-wrap justify-center gap-2.5 pt-4 mt-3 border-t border-neon-blue/20">
-                    {[
-                      { name: 'HTML/CSS', pct: 90, color: '#E34F26' },
-                      { name: 'JavaScript', pct: 80, color: '#F7DF1E' },
-                      { name: 'PHP', pct: 80, color: '#777BB4' },
-                      { name: 'Python', pct: 67, color: '#3776AB' },
-                      { name: 'Dart', pct: 60, color: '#0175C2' },
-                    ].map((d) => (
+                    {currentLanguages.map((d) => (
                       <span
                         key={d.name}
                         className="flex items-center gap-2 px-3.5 py-1.5 rounded-lg bg-dark-950/85 text-xs transition-transform hover:scale-105"
                         style={{
-                          border: `1px solid ${d.color}75`,
-                          boxShadow: `0 0 8px ${d.color}25`
+                          border: `1px solid ${d.color || '#00f0ff'}75`,
+                          boxShadow: `0 0 8px ${d.color || '#00f0ff'}25`
                         }}
                       >
-                        <span className="w-2 h-2 rounded-full" style={{ background: d.color, boxShadow: `0 0 6px ${d.color}` }} />
+                        <span className="w-2 h-2 rounded-full" style={{ background: d.color || '#00f0ff', boxShadow: `0 0 6px ${d.color || '#00f0ff'}` }} />
                         <span className="text-[11px] font-medium text-gray-200">{d.name}</span>
-                        <span className="text-[11px] font-mono font-bold" style={{ color: d.color }}>{d.pct}%</span>
+                        <span className="text-[11px] font-mono font-bold" style={{ color: d.color || '#00f0ff' }}>{d.level}%</span>
                       </span>
                     ))}
                   </div>
@@ -1046,25 +1087,19 @@ export default function HomePage({ profile, projects, experiences = [], research
                   </div>
 
                   <div className="flex flex-col gap-5 flex-1 justify-center my-2">
-                    {[
-                      { skill: 'HTML / CSS',  level: 90, color: '#E34F26', icon: 'fa-brands fa-html5' },
-                      { skill: 'JavaScript',  level: 80, color: '#F7DF1E', icon: 'fa-brands fa-js' },
-                      { skill: 'PHP',         level: 80, color: '#777BB4', icon: 'fa-brands fa-php' },
-                      { skill: 'Python',      level: 67, color: '#3776AB', icon: 'fa-brands fa-python' },
-                      { skill: 'Dart',        level: 60, color: '#0175C2', icon: 'fa-solid fa-mobile-screen' },
-                    ].map((s) => (
-                      <div key={s.skill} className="group">
+                    {currentLanguages.map((s) => (
+                      <div key={s.name} className="group">
                         <div className="flex justify-between items-center mb-2">
                           <div className="flex items-center gap-2.5">
-                            <i className={`${s.icon} text-base transition-transform group-hover:scale-110`} style={{ color: s.color }} />
-                            <span className="text-xs font-semibold text-gray-200 tracking-wide">{s.skill}</span>
+                            {renderTechIcon(s, 'text-base transition-transform group-hover:scale-110')}
+                            <span className="text-xs font-semibold text-gray-200 tracking-wide">{s.name}</span>
                           </div>
                           <span
                             className="text-xs font-bold font-mono px-2 py-0.5 rounded"
                             style={{
-                              color: s.color,
-                              background: `${s.color}15`,
-                              border: `1px solid ${s.color}50`
+                              color: s.color || '#a78bfa',
+                              background: `${s.color || '#a78bfa'}15`,
+                              border: `1px solid ${s.color || '#a78bfa'}50`
                             }}
                           >
                             {s.level}%
@@ -1072,14 +1107,14 @@ export default function HomePage({ profile, projects, experiences = [], research
                         </div>
                         <div
                           className="skill-bar-track h-2.5 bg-dark-950/90 rounded-full overflow-hidden p-0.5"
-                          style={{ border: `1px solid ${s.color}30` }}
+                          style={{ border: `1px solid ${s.color || '#a78bfa'}30` }}
                         >
                           <div
                             className="skill-bar-fill h-full rounded-full transition-all duration-1000"
                             style={{
                               width: `${s.level}%`,
-                              background: `linear-gradient(90deg, ${s.color}70, ${s.color})`,
-                              boxShadow: `0 0 10px ${s.color}40`,
+                              background: `linear-gradient(90deg, ${s.color || '#a78bfa'}70, ${s.color || '#a78bfa'})`,
+                              boxShadow: `0 0 10px ${s.color || '#a78bfa'}40`,
                             }}
                           />
                         </div>
@@ -1092,7 +1127,7 @@ export default function HomePage({ profile, projects, experiences = [], research
                       <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
                       <span className="text-[11px] text-gray-400">Actively practicing & refining code</span>
                     </span>
-                    <span className="text-[11px] font-mono text-neon-blue">5 Languages</span>
+                    <span className="text-[11px] font-mono text-neon-blue">{currentLanguages.length} Languages</span>
                   </div>
                 </div>
 
@@ -1116,7 +1151,7 @@ export default function HomePage({ profile, projects, experiences = [], research
                       boxShadow: '0 0 10px rgba(0, 240, 255, 0.25)'
                     }}
                   >
-                    15 Stack Items
+                    {currentProgrammingMarkup.length + currentFrameworksDb.length} Stack Items
                   </span>
                 </div>
 
@@ -1129,9 +1164,9 @@ export default function HomePage({ profile, projects, experiences = [], research
                       <span>Programming & Markup</span>
                     </p>
                     <div className="flex flex-wrap gap-2.5">
-                      {programmingMarkupList.map((t) => (
-                        <div key={t.name} className="tech-badge" style={{ '--tech-color': t.color }}>
-                          {t.customIcon ? t.customIcon : <i className={`${t.icon} text-base`} style={{ color: t.color }} />}
+                      {currentProgrammingMarkup.map((t) => (
+                        <div key={t.name} className="tech-badge" style={{ '--tech-color': t.color || '#00f0ff' }}>
+                          {renderTechIcon(t, 'text-base')}
                           <span className="text-xs font-semibold">{t.name}</span>
                         </div>
                       ))}
@@ -1145,9 +1180,9 @@ export default function HomePage({ profile, projects, experiences = [], research
                       <span>Frameworks, Libraries & Database</span>
                     </p>
                     <div className="flex flex-wrap gap-2.5">
-                      {frameworksDbList.map((t) => (
-                        <div key={t.name} className="tech-badge" style={{ '--tech-color': t.color }}>
-                          {t.customIcon ? t.customIcon : <i className={`${t.icon} text-base`} style={{ color: t.color }} />}
+                      {currentFrameworksDb.map((t) => (
+                        <div key={t.name} className="tech-badge" style={{ '--tech-color': t.color || '#a78bfa' }}>
+                          {renderTechIcon(t, 'text-base')}
                           <span className="text-xs font-semibold">{t.name}</span>
                         </div>
                       ))}
@@ -1178,15 +1213,15 @@ export default function HomePage({ profile, projects, experiences = [], research
                   </span>
                 </div>
 
-                {/* Grid 6 Tool Cards di Desktop (2 baris di mobile, 3 di tablet, 6 di desktop) */}
+                {/* Grid Tool Cards di Desktop */}
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3.5">
-                  {workflowToolsList.map((tool) => (
-                    <div key={tool.name} className="tool-detail-card" style={{ '--tool-color': tool.color }}>
+                  {currentWorkflowTools.map((tool) => (
+                    <div key={tool.name} className="tool-detail-card" style={{ '--tool-color': tool.color || '#f472b6' }}>
                       <div
                         className="tool-icon-box"
-                        style={{ background: `${tool.color}18`, color: tool.color }}
+                        style={{ background: `${tool.color || '#f472b6'}18`, color: tool.color || '#f472b6' }}
                       >
-                        <i className={`${tool.icon} text-lg`} />
+                        {renderTechIcon(tool, 'text-lg')}
                       </div>
                       <div className="min-w-0 flex-1 text-left">
                         <h5 className="text-xs font-bold text-white truncate text-left">{tool.name}</h5>
@@ -1220,18 +1255,13 @@ export default function HomePage({ profile, projects, experiences = [], research
                 </div>
 
                 <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
-                  {[
-                    { name: 'Problem Solving',     sub: 'Analytical & Creative',     icon: 'fa-solid fa-lightbulb',        color: '#00f0ff' },
-                    { name: 'Team Collaboration',  sub: 'Cross-functional Synergy', icon: 'fa-solid fa-people-group',      color: '#a78bfa' },
-                    { name: 'Effective Communication', sub: 'Clear & Articulate',    icon: 'fa-solid fa-comments',          color: '#f472b6' },
-                    { name: 'Adaptive & Agile',    sub: 'Quick Continuous Learner',  icon: 'fa-solid fa-bolt',              color: '#34d399' },
-                  ].map((skill) => (
-                    <div key={skill.name} className="tool-detail-card" style={{ '--tool-color': skill.color }}>
+                  {currentInterpersonalSkills.map((skill) => (
+                    <div key={skill.name} className="tool-detail-card" style={{ '--tool-color': skill.color || '#34d399' }}>
                       <div
                         className="tool-icon-box"
-                        style={{ background: `${skill.color}18`, color: skill.color }}
+                        style={{ background: `${skill.color || '#34d399'}18`, color: skill.color || '#34d399' }}
                       >
-                        <i className={`${skill.icon} text-lg`} />
+                        <i className={`${skill.icon || 'fa-solid fa-bolt'} text-lg`} />
                       </div>
                       <div className="min-w-0 flex-1 text-left">
                         <h5 className="text-xs font-bold text-white truncate text-left">{skill.name}</h5>
@@ -1246,7 +1276,6 @@ export default function HomePage({ profile, projects, experiences = [], research
 
           </div>
         </section>
-
 
         <section id="projects" className="homepage-section py-20 md:py-24 bg-dark-900/50 scroll-mt-20">
           <div className="site-container">
