@@ -102,6 +102,7 @@ export function parseSkillsData(rawSkills, rawTools, rawSoftSkills) {
   if (rawSkills && typeof rawSkills === 'object' && !Array.isArray(rawSkills)) {
     return {
       _cvUrl: rawSkills._cvUrl || '',
+      _researches: Array.isArray(rawSkills._researches) ? rawSkills._researches : [],
       languages: Array.isArray(rawSkills.languages) && rawSkills.languages.length > 0
         ? rawSkills.languages
         : defaultSkillsData.languages,

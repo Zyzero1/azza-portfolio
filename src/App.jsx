@@ -173,6 +173,9 @@ function useData() {
             try {
               const parsedSkills = parseSkillsData(p.skills, p.tools, p.soft_skills);
               setSkillsData(parsedSkills);
+              if (parsedSkills._researches && Array.isArray(parsedSkills._researches) && parsedSkills._researches.length > 0) {
+                setResearches(parsedSkills._researches);
+              }
             } catch (sErr) {
               console.warn('Failed to parse skills from profile:', sErr);
             }
@@ -586,6 +589,21 @@ function Admin({ data }) {
       }
 
       data.setResearches(updatedList);
+
+      if (isSupabaseConfigured) {
+        try {
+          const currentSkills = data.skillsData || {};
+          const updatedSkills = { ...currentSkills, _researches: updatedList };
+          await supabase.from('profiles').update({
+            skills: updatedSkills,
+            updated_at: new Date().toISOString()
+          }).not('id', 'is', null);
+          data.setSkillsData(updatedSkills);
+        } catch (syncErr) {
+          console.warn('profiles.skills._researches sync err:', syncErr);
+        }
+      }
+
       setNotice(editingResearchId ? 'Data riset berhasil diperbarui.' : 'Data riset baru berhasil ditambahkan.');
       resetResearchForm();
     } catch (err) {
@@ -595,10 +613,29 @@ function Admin({ data }) {
     }
   };
 
-  const removeResearch = (id) => {
-    const updatedList = data.researches.filter(item => item.id !== id);
-    data.setResearches(updatedList);
-    setNotice('Data riset berhasil dihapus.');
+  const removeResearch = async (id) => {
+    try {
+      const updatedList = data.researches.filter(item => item.id !== id);
+      data.setResearches(updatedList);
+
+      if (isSupabaseConfigured) {
+        try {
+          const currentSkills = data.skillsData || {};
+          const updatedSkills = { ...currentSkills, _researches: updatedList };
+          await supabase.from('profiles').update({
+            skills: updatedSkills,
+            updated_at: new Date().toISOString()
+          }).not('id', 'is', null);
+          data.setSkillsData(updatedSkills);
+        } catch (syncErr) {
+          console.warn('profiles.skills._researches sync err:', syncErr);
+        }
+      }
+
+      setNotice('Data riset berhasil dihapus.');
+    } catch (err) {
+      setNotice(`Error: ${err.message}`);
+    }
   };
 
   const resetEducationForm = () => {
@@ -692,10 +729,11 @@ function Admin({ data }) {
         localStorage.setItem('portfolio_cv_url', safeCvToSave);
       }
 
-      // Embed _cvUrl inside skills JSON so it persists across refreshes and cloud DB
+      // Embed _cvUrl and _researches inside skills JSON so it persists across refreshes and cloud DB
       const skillsPayload = {
         ...(data.skillsData || {}),
-        ...(safeCvToSave ? { _cvUrl: safeCvToSave } : {})
+        ...(safeCvToSave ? { _cvUrl: safeCvToSave } : {}),
+        ...(data.researches && data.researches.length > 0 ? { _researches: data.researches } : {})
       };
 
       // Base columns that are guaranteed to exist in Supabase profiles table
