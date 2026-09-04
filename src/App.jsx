@@ -130,10 +130,9 @@ function useData() {
     Promise.allSettled([
       supabase.from('profiles').select('*').limit(1).maybeSingle(),
       supabase.from('projects').select('*').order('created_at', { ascending: false }),
-      supabase.from('articles').select('*').eq('published', true).order('date', { ascending: false }),
-      supabase.from('experiences').select('*').order('created_at', { ascending: false })
+      supabase.from('articles').select('*').eq('published', true).order('date', { ascending: false })
     ])
-      .then(([profileResult, projectsResult, articlesResult, expResult]) => {
+      .then(([profileResult, projectsResult, articlesResult]) => {
         if (!active) return;
 
         if (profileResult.status === 'fulfilled' && profileResult.value.data) {
@@ -171,15 +170,6 @@ function useData() {
               console.warn('Failed to parse skills from profile:', sErr);
             }
           }
-        }
-
-        if (expResult.status === 'fulfilled' && expResult.value.data?.length) {
-          setExperiences(expResult.value.data.map((item) => ({
-            ...item,
-            description: Array.isArray(item.description)
-              ? item.description
-              : (typeof item.description === 'string' ? item.description.split('\n').filter(Boolean) : [])
-          })));
         }
 
         if (projectsResult.status === 'fulfilled' && projectsResult.value.data?.length) {
@@ -513,16 +503,6 @@ function Admin({ data }) {
 
       if (isSupabaseConfigured) {
         try {
-          if (editingExpId && typeof editingExpId === 'string' && editingExpId.length > 20) {
-            await supabase.from('experiences').update(payload).eq('id', editingExpId);
-          } else if (!editingExpId) {
-            await supabase.from('experiences').insert(payload);
-          }
-        } catch (err) {
-          console.warn('experiences table insert fallback:', err);
-        }
-
-        try {
           await supabase.from('profiles').update({
             experience: JSON.stringify(updatedList),
             updated_at: new Date().toISOString()
@@ -547,9 +527,6 @@ function Admin({ data }) {
       data.setExperiences(updatedList);
 
       if (isSupabaseConfigured) {
-        try {
-          await supabase.from('experiences').delete().eq('id', id);
-        } catch {}
         try {
           await supabase.from('profiles').update({
             experience: JSON.stringify(updatedList),
