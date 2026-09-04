@@ -271,6 +271,13 @@ footer > .site-container {
   transform: none !important;
 }
 
+@media (max-width: 768px) {
+  .project-card {
+    width: min(100%, 24rem) !important;
+    max-width: 100% !important;
+  }
+}
+
 /* ── See More Projects Button ── */
 .see-more-wrapper {
   margin-top: 3rem !important;
@@ -430,7 +437,7 @@ footer > .site-container {
   grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
   gap: 1.75rem !important;
   width: 100% !important;
-  max-width: 68rem !important;
+  max-width: 65rem !important;
   margin-inline: auto !important;
   margin-top: 0 !important;
   align-items: stretch !important;
@@ -439,7 +446,7 @@ footer > .site-container {
 @media (max-width: 900px) {
   .contact-cards-grid {
     grid-template-columns: 1fr !important;
-    max-width: 28rem !important;
+    max-width: 26.5rem !important;
   }
 }
 
