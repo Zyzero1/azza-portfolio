@@ -3,6 +3,7 @@
 
 @import "tailwindcss";
 
+
 @theme {
   --color-dark-950: #050b17;
   --color-dark-900: #071426;
@@ -11,15 +12,17 @@
   --color-neon-pink: #ff00c8;
 }
 
+html {
+  overflow-x: hidden;
+}
+
 body {
   background-color: #050b17;
   background-image:
     radial-gradient(circle at 25% 10%, rgba(0, 240, 255, 0.1) 0%, transparent 20%),
     radial-gradient(circle at 75% 30%, rgba(144, 0, 255, 0.08) 0%, transparent 25%),
     radial-gradient(circle at 50% 80%, rgba(255, 0, 200, 0.1) 0%, transparent 20%);
-  background-attachment: fixed;
   min-height: 100vh;
-  overflow-x: hidden;
 }
 
 .teks-neon {
@@ -31,12 +34,9 @@ body {
 
 /* ── Hero Banner Header Clearance ── */
 #home {
-  padding-top: 5rem !important;
+  padding-top: 0 !important;
 }
 
-#home>.site-container {
-  padding-top: 2rem !important;
-}
 
 /* ── Hero Role Badge & Blinking Dot ── */
 .hero-role-badge {
@@ -337,13 +337,23 @@ body {
 
   /* ── Hero Responsive Header Clearance ── */
   #home {
-    padding-top: 6.5rem !important;
-    min-height: 100svh;
+    padding-top: 0 !important;
+    min-height: auto !important;
   }
 
   #home>.site-container {
-    padding-top: 1.25rem !important;
-    padding-bottom: 3.5rem !important;
+    padding-top: 1.5rem !important;
+    padding-bottom: 3.35rem !important;
+    width: min(100% - 3rem, 1180px) !important;
+    padding-left: 1rem !important;
+    padding-right: 1rem !important;
+    flex: none !important;
+  }
+
+  /* ── Scroll Indicator Mobile Clearance ── */
+  .hero-scroll-indicator {
+    margin-top: 0.25rem !important;
+    margin-bottom: 2rem !important;
   }
 
   .hero-title-name {
@@ -357,43 +367,155 @@ body {
     font-size: 0.8rem !important;
   }
 
-  /* ── Compact Buttons on Mobile ── */
+  /* ── Buttons on Mobile ── */
   .hero-actions {
     margin-top: 1.25rem !important;
     margin-bottom: 1.5rem !important;
-    gap: 0.65rem !important;
+    gap: 0.75rem !important;
   }
 
   .hero-contact-button,
   .hero-project-button {
-    padding: 0.7rem 1.35rem !important;
-    font-size: 0.85rem !important;
-    gap: 0.4rem !important;
+    padding: 0.75rem 1.4rem !important;
+    font-size: 0.95rem !important;
+    gap: 0.45rem !important;
   }
 
-  /* ── Compact Stats Box on Mobile ── */
+  /* ── Stats Box on Mobile ── */
   .hero-stats {
     margin-bottom: 1.25rem !important;
     gap: 0.6rem !important;
   }
 
   .hero-stats .stat-card {
-    padding: 0.6rem 0.4rem !important;
+    padding: 0.65rem 0.5rem !important;
   }
 
   .hero-stats .stat-card p:first-child {
-    font-size: 1.35rem !important;
+    font-size: 1.5rem !important;
   }
 
   .hero-stats .stat-card p:last-child {
-    font-size: 0.65rem !important;
+    font-size: 0.75rem !important;
     letter-spacing: 0.04em !important;
   }
 
-  /* ── Compact Social Icons on Mobile ── */
+  /* ── Social Icons on Mobile ── */
   .social-icon {
-    width: 2.25rem !important;
-    height: 2.25rem !important;
+    width: 2.35rem !important;
+    height: 2.35rem !important;
+    font-size: 1rem !important;
+  }
+
+  /* ── Section Titles & Content Typography on Mobile ── */
+  .section-heading h2 {
+    font-size: clamp(2rem, 7vw, 2.5rem) !important;
+  }
+
+  .section-description {
+    font-size: 0.975rem !important;
+    line-height: 1.65 !important;
+  }
+
+  /* ── About Section Content Typography ── */
+  .about-side-by-side-grid h3 {
+    font-size: 1.45rem !important;
+  }
+
+  .about-side-by-side-grid p {
+    font-size: 0.95rem !important;
+    line-height: 1.65 !important;
+  }
+
+  .about-side-by-side-grid .font-mono {
+    font-size: 0.85rem !important;
+  }
+
+  .about-side-by-side-grid a {
+    font-size: 0.925rem !important;
+  }
+
+  .about-tab-btn {
+    font-size: 0.925rem !important;
+  }
+
+  .about-timeline-card h4 {
+    font-size: 1.15rem !important;
+  }
+
+  .about-timeline-card h4 span {
+    font-size: 1.05rem !important;
+  }
+
+  .about-timeline-card p {
+    font-size: 0.925rem !important;
+  }
+
+  .about-timeline-card span {
+    font-size: 0.85rem !important;
+  }
+
+  .about-timeline-card ul li,
+  .about-timeline-card p:last-child {
+    font-size: 0.925rem !important;
+    line-height: 1.75 !important;
+  }
+
+  /* ── Skills Section Content Typography ── */
+  .skills-2x2-container h3,
+  .skills-2x2-container h4 {
+    font-size: 1.25rem !important;
+  }
+
+  .skills-2x2-container p,
+  .skills-2x2-container span {
+    font-size: 0.925rem !important;
+  }
+
+  .skills-2x2-container .project-tech-chip {
+    font-size: 0.825rem !important;
+  }
+
+  /* ── Projects Section Content Typography ── */
+  .project-card .project-title {
+    font-size: 1.25rem !important;
+    line-height: 1.4 !important;
+  }
+
+  .project-card .project-desc-clamp {
+    font-size: 0.95rem !important;
+    line-height: 1.6 !important;
+  }
+
+  .project-card .project-cat-badge {
+    font-size: 0.8rem !important;
+  }
+
+  .project-card .project-tech-chip {
+    font-size: 0.8rem !important;
+    padding: 0.28rem 0.65rem !important;
+  }
+
+  .see-more-projects-btn {
+    font-size: 0.95rem !important;
+  }
+
+  /* ── Contact Section Content Typography ── */
+  .contact-card h3 {
+    font-size: 1.35rem !important;
+  }
+
+  .contact-card p {
+    font-size: 0.95rem !important;
+    line-height: 1.6 !important;
+  }
+
+  .contact-category-pill {
+    font-size: 0.825rem !important;
+    padding: 0.35rem 0.95rem !important;
+  }
+
+  .contact-social-item span {
     font-size: 0.95rem !important;
   }
 
@@ -402,17 +524,21 @@ body {
   }
 
   .homepage-section>.site-container,
+  footer>.site-container,
   .footer-container {
-    width: min(100% - 1.5rem, 1280px);
+    width: min(100% - 3rem, 1180px) !important;
+    padding-left: 1rem !important;
+    padding-right: 1rem !important;
   }
 
-  .footer-container {
-    padding-inline: 0;
+  .footer-social-group {
+    margin-bottom: 1.25rem !important;
   }
 }
 
 .nav-link {
   position: relative;
+  font-weight: 600;
 }
 
 .nav-link::after {
@@ -429,6 +555,53 @@ body {
 .nav-link:hover::after,
 .nav-link.active::after {
   width: 100%;
+}
+
+/* ── Badge Borders (Matching Font Color & More Spacious) ── */
+.about-badge-experience,
+.about-badge-research,
+.about-badge-education {
+  padding: 0.2rem 0.55rem !important;
+  border-radius: 8px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  line-height: 1 !important;
+}
+
+.about-badge-experience {
+  color: #00f0ff !important;
+  border-color: #00f0ff !important;
+}
+
+.about-badge-research {
+  color: #a78bfa !important;
+  border-color: #a78bfa !important;
+}
+
+.about-badge-education {
+  color: #f472b6 !important;
+  border-color: #f472b6 !important;
+}
+
+/* ── Jarak Institusi ke Deskripsi (Enter/Gap Nyata) ── */
+.about-timeline-institution {
+  margin-bottom: 1.5rem !important;
+}
+
+/* ── Jarak Baris per Baris Deskripsi 1.5 ── */
+.about-timeline-desc,
+.about-timeline-card ul li,
+.about-timeline-card p.about-timeline-desc {
+  line-height: 1.5 !important;
+}
+
+.about-timeline-card ul li {
+  margin-bottom: 0.75rem !important;
+}
+
+.about-timeline-card ul li:last-child {
+  margin-bottom: 0 !important;
 }
 
 .kartu-transparan {
@@ -790,6 +963,7 @@ body {
 /* ── Premium Profile Card ── */
 .profile-card-frame {
   position: relative;
+  margin-top: 1.5rem !important; 
   width: 300px;
   height: 380px;
   border-radius: 20px;

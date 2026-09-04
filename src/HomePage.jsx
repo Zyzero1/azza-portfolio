@@ -168,6 +168,8 @@ export default function HomePage({ profile, projects, experiences = [], research
   const [showProjectsModal, setShowProjectsModal] = useState(false);
   const [activeAboutTab, setActiveAboutTab] = useState('experience');
   const navRef = useRef(null);
+  const headerRef = useRef(null);
+  const [headerHeight, setHeaderHeight] = useState(0);
   const socials = [
     ['fa-github', 'GitHub', 'https://github.com/Zyzero1'],
     ['fa-linkedin-in', 'LinkedIn', 'https://www.linkedin.com/in/m-azza-alkausar/'],
@@ -187,6 +189,23 @@ export default function HomePage({ profile, projects, experiences = [], research
     window.addEventListener('resize', updateNavWidth);
     return () => window.removeEventListener('resize', updateNavWidth);
   }, []);
+
+  // Ukur tinggi header secara real-time — update setiap kali mobile menu buka/tutup
+  // sehingga <main> selalu mulai tepat di bawah header (tidak tertabrak)
+  useEffect(() => {
+    const measure = () => {
+      if (headerRef.current) {
+        setHeaderHeight(headerRef.current.offsetHeight);
+      }
+    };
+    // Ukur setelah DOM selesai render (rAF agar animasi menu selesai dulu)
+    const raf = requestAnimationFrame(measure);
+    window.addEventListener('resize', measure);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener('resize', measure);
+    };
+  }, [mobileMenu]);
 
   useEffect(() => {
     if (showProjectsModal) {
@@ -344,7 +363,7 @@ export default function HomePage({ profile, projects, experiences = [], research
       <div className={`cursor hidden md:block ${hovered ? 'expand' : ''}`} style={{ left: cursor.x, top: cursor.y }} />
       <div className={`cursor-follower hidden md:block ${hovered ? 'expand-follower' : ''}`} style={{ left: cursor.x, top: cursor.y }} />
 
-      <header className="home-header fixed inset-x-0 top-0 z-50 bg-dark-950/90 backdrop-blur-xl border-b border-white/25">
+      <header ref={headerRef} className="home-header fixed inset-x-0 top-0 z-50 bg-dark-950/90 backdrop-blur-xl border-b border-white/25">
         <div className="site-container">
           <div className="home-header-row flex items-center justify-between py-2.5">
             <button onClick={() => scrollTo('home')} className="shrink-0 flex items-center justify-start cursor-pointer" aria-label="Logo AZ - Go to Home">
@@ -369,7 +388,7 @@ export default function HomePage({ profile, projects, experiences = [], research
             </nav>
 
             <div className="flex items-center gap-5">
-              {/* Icon GitHub & LinkedIn digeser ke kiri (sebelum Contact Me) */}
+              {/* Icon GitHub & LinkedIn */}
               <div className="header-social-group flex items-center gap-3.5">
                 <a
                   href="https://github.com/Zyzero1"
@@ -416,7 +435,7 @@ export default function HomePage({ profile, projects, experiences = [], research
           </div>
 
           {mobileMenu && (
-            <nav className="home-mobile-nav pb-4 grid gap-1 border-t border-neon-blue/10 pt-4">
+            <nav className="home-mobile-nav grid gap-0.5 border-t border-neon-blue/10 pt-2 pb-3">
               {scrollSections.map(({ id, label }) => (
                 <button
                   key={id}
@@ -426,6 +445,37 @@ export default function HomePage({ profile, projects, experiences = [], research
                   {label}
                 </button>
               ))}
+
+              {/* Garis pemisah antara menu contact dan icon sosial */}
+              <div className="mobile-menu-social-container">
+                <a
+                  href="https://github.com/Zyzero1"
+                  target="_blank"
+                  rel="noreferrer"
+                  aria-label="GitHub Profile"
+                  title="GitHub Profile"
+                  className="mobile-menu-social-link"
+                  {...hoverProps}
+                >
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path fillRule="evenodd" clipRule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" />
+                  </svg>
+                </a>
+
+                <a
+                  href="https://www.linkedin.com/in/m-azza-alkausar/"
+                  target="_blank"
+                  rel="noreferrer"
+                  aria-label="LinkedIn Profile"
+                  title="LinkedIn Profile"
+                  className="mobile-menu-social-link"
+                  {...hoverProps}
+                >
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M19 3a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h14m-.5 15.5v-5.3a3.26 3.26 0 0 0-3.26-3.26c-.85 0-1.84.52-2.28 1.3v-1.11h-2.79v8.37h2.79v-4.93c0-.77.62-1.4 1.39-1.4a1.4 1.4 0 0 1 1.4 1.4v4.93h2.75M6.88 8.56a1.68 1.68 0 0 0 1.68-1.68c0-.93-.75-1.69-1.68-1.69a1.69 1.69 0 0 0-1.69 1.69c0 .93.76 1.68 1.69 1.68m1.39 9.94v-8.37H5.5v8.37h2.77z" />
+                  </svg>
+                </a>
+              </div>
             </nav>
           )}
         </div>
@@ -437,10 +487,10 @@ export default function HomePage({ profile, projects, experiences = [], research
         </div>
       )}
 
-      <main>
-        {/* HERO — fills the viewport under the header */}
-        <section id="home" className="relative grid-bg overflow-hidden scroll-mt-20 flex flex-col min-h-screen pt-28 md:pt-32">
-          <div className="site-container relative z-10 flex-1 grid md:grid-cols-2 gap-10 lg:gap-16 items-center pt-4 md:pt-8 pb-12">
+      <main style={{ paddingTop: headerHeight > 0 ? `${headerHeight}px` : '5rem' }}>
+        {/* HERO — fills the viewport under the header. padding-top diatur di <main> secara dinamis */}
+        <section id="home" className="relative grid-bg overflow-hidden scroll-mt-20 flex flex-col min-h-screen">
+          <div className="site-container relative z-10 flex-1 grid md:grid-cols-2 gap-10 lg:gap-16 items-start md:items-center pt-2 md:pt-3 pb-12">
             <div className="min-w-0">
               {/* Role pill badge with pulsing dot */}
               <div className="hero-role-badge inline-flex items-center gap-3 px-5 py-2 rounded-full mb-4">
@@ -519,7 +569,7 @@ export default function HomePage({ profile, projects, experiences = [], research
             </div>
           </div>
 
-          <button onClick={() => scrollTo('about')} className="mx-auto mb-8 flex flex-col items-center gap-2 text-gray-500 hover:text-neon-blue transition-colors" aria-label="Scroll down">
+          <button onClick={() => scrollTo('about')} className="hero-scroll-indicator mx-auto mb-8 flex flex-col items-center gap-2 text-gray-500 hover:text-neon-blue transition-colors" aria-label="Scroll down">
             <span className="text-xs uppercase tracking-[.3em]">Scroll</span>
             <i className="fa-solid fa-chevron-down animate-bounce" />
           </button>
@@ -702,7 +752,10 @@ export default function HomePage({ profile, projects, experiences = [], research
                             <h4 className="text-base font-bold text-white flex flex-wrap items-center gap-2.5 text-left justify-start">
                               <span className="text-left">{item.title}</span>
                               {item.badge && (
-                                <span className="text-[11px] font-mono px-3 py-1 rounded-md bg-neon-blue/10 text-neon-blue border border-neon-blue shrink-0 font-semibold tracking-wide">
+                                <span
+                                  className="about-badge-experience text-[11px] font-mono rounded-lg bg-neon-blue/10 border shrink-0 font-semibold tracking-wide"
+                                  style={{ color: '#00f0ff', borderColor: '#00f0ff', padding: '0.35rem 0.85rem' }}
+                                >
                                   {item.badge}
                                 </span>
                               )}
@@ -711,13 +764,19 @@ export default function HomePage({ profile, projects, experiences = [], research
                               {item.period}
                             </span>
                           </div>
-                          <p className="text-xs font-semibold text-neon-blue/90 mb-3.5 flex items-center gap-2 text-left justify-start">
+                          <p
+                            className="about-timeline-institution text-xs font-semibold text-neon-blue/90 flex items-center gap-2 text-left justify-start"
+                            style={{ marginBottom: '1.5rem' }}
+                          >
                             <i className="fa-solid fa-building text-neon-blue text-xs shrink-0" />
                             <span className="text-left">{item.company}</span>
                           </p>
-                          <ul className="text-xs text-gray-300 space-y-2.5 list-disc list-inside leading-relaxed text-left">
+                          <ul
+                            className="about-timeline-desc text-xs text-gray-300 list-disc list-inside text-left"
+                            style={{ lineHeight: '1.5' }}
+                          >
                             {(Array.isArray(item.description) ? item.description : String(item.description || '').split('\n').filter(Boolean)).map((desc, dIdx) => (
-                              <li key={dIdx} className="text-left">{desc}</li>
+                              <li key={dIdx} className="text-left mb-3 last:mb-0" style={{ lineHeight: '1.5' }}>{desc}</li>
                             ))}
                           </ul>
                         </div>
@@ -734,7 +793,10 @@ export default function HomePage({ profile, projects, experiences = [], research
                             <h4 className="text-base font-bold text-white flex flex-wrap items-center gap-2.5 text-left justify-start">
                               <span className="text-left">{item.title}</span>
                               {item.badge && (
-                                <span className="text-[11px] font-mono px-3 py-1 rounded-md bg-neon-purple/10 text-neon-purple border border-neon-purple shrink-0 font-semibold tracking-wide">
+                                <span
+                                  className="about-badge-research text-[11px] font-mono rounded-lg bg-neon-purple/10 border shrink-0 font-semibold tracking-wide"
+                                  style={{ color: '#a78bfa', borderColor: '#a78bfa', padding: '0.35rem 0.85rem' }}
+                                >
                                   {item.badge}
                                 </span>
                               )}
@@ -743,13 +805,19 @@ export default function HomePage({ profile, projects, experiences = [], research
                               {item.period}
                             </span>
                           </div>
-                          <p className="text-xs font-semibold text-neon-purple/90 mb-3.5 flex items-center gap-2 text-left justify-start">
+                          <p
+                            className="about-timeline-institution text-xs font-semibold text-neon-purple/90 flex items-center gap-2 text-left justify-start"
+                            style={{ marginBottom: '1.5rem' }}
+                          >
                             <i className="fa-solid fa-microchip text-neon-purple text-xs shrink-0" />
                             <span className="text-left">{item.institution || item.company}</span>
                           </p>
-                          <ul className="text-xs text-gray-300 space-y-2.5 list-disc list-inside leading-relaxed text-left">
+                          <ul
+                            className="about-timeline-desc text-xs text-gray-300 list-disc list-inside text-left"
+                            style={{ lineHeight: '1.5' }}
+                          >
                             {(Array.isArray(item.description) ? item.description : String(item.description || '').split('\n').filter(Boolean)).map((desc, dIdx) => (
-                              <li key={dIdx} className="text-left">{desc}</li>
+                              <li key={dIdx} className="text-left mb-3 last:mb-0" style={{ lineHeight: '1.5' }}>{desc}</li>
                             ))}
                           </ul>
                         </div>
@@ -766,7 +834,10 @@ export default function HomePage({ profile, projects, experiences = [], research
                             <h4 className="text-base font-bold text-white flex flex-wrap items-center gap-2.5 text-left justify-start">
                               <span className="text-left">{item.title}</span>
                               {item.badge && (
-                                <span className="text-[11px] font-mono px-3 py-1 rounded-md bg-neon-pink/10 text-neon-pink border border-neon-pink shrink-0 font-semibold tracking-wide">
+                                <span
+                                  className="about-badge-education text-[11px] font-mono rounded-lg bg-neon-pink/10 border shrink-0 font-semibold tracking-wide"
+                                  style={{ color: '#f472b6', borderColor: '#f472b6', padding: '0.35rem 0.85rem' }}
+                                >
                                   {item.badge}
                                 </span>
                               )}
@@ -775,11 +846,17 @@ export default function HomePage({ profile, projects, experiences = [], research
                               {item.period}
                             </span>
                           </div>
-                          <p className="text-xs font-semibold text-neon-pink/90 mb-3.5 flex items-center gap-2 text-left justify-start">
+                          <p
+                            className="about-timeline-institution text-xs font-semibold text-neon-pink/90 flex items-center gap-2 text-left justify-start"
+                            style={{ marginBottom: '1.5rem' }}
+                          >
                             <i className="fa-solid fa-university text-neon-pink text-xs shrink-0" />
                             <span className="text-left">{item.institution || item.company}</span>
                           </p>
-                          <p className="text-xs text-gray-300 leading-relaxed text-left">
+                          <p
+                            className="about-timeline-desc text-xs text-gray-300 text-left"
+                            style={{ lineHeight: '1.5' }}
+                          >
                             {Array.isArray(item.description) ? item.description.join(' ') : item.description}
                           </p>
                         </div>
