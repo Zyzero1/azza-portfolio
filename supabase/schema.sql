@@ -42,6 +42,7 @@ alter table public.profiles add column if not exists email text default 'azza.al
 alter table public.profiles add column if not exists availability text default 'Available for Work';
 alter table public.profiles add column if not exists linkedin text default 'https://www.linkedin.com/in/m-azza-alkausar/';
 alter table public.profiles add column if not exists cv_url text default '/uploads/img_686a5952b576b.jpg';
+alter table public.projects add column if not exists sort_order int default 0;
 
 create table if not exists public.experiences (
   id uuid primary key default gen_random_uuid(),
