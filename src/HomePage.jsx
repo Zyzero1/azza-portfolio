@@ -1410,7 +1410,8 @@ export default function HomePage({
             </button>
             <div className="footer-center flex items-center justify-center">
               <p className="footer-copyright-text">
-                <span>Designed &amp; Built by</span>
+                <span>Designed &amp; Built</span>
+                <span>&nbsp;by</span>
                 <span className="footer-copyright-name">
                   <span className="teks-neon font-bold">Muhammad Azza Al Kausar</span>
                 </span>
